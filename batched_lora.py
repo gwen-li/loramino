@@ -23,7 +23,8 @@ class BatchedLoRA(torch.nn.Module):
         adapter_ids = torch.arange(batch_size, device=device) % self.num_adapters
         adapter_ids = adapter_ids.repeat_interleave(seq_len)
 
-        # Inefficient - Change to group
+        # FIX
+        ## Inefficient - Change to group
         A = self.A[adapter_ids]
         B = self.B[adapter_ids]
 
