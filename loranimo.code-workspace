@@ -4,10 +4,6 @@
 			"name": "loranimo",
 			"path": "."
 		},
-		{
-			"name": "TinyLlama-main",
-			"path": "../../../Downloads/TinyLlama-main"
-		}
 	],
 	"settings": {}
 }
