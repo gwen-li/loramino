@@ -1,1 +1,1 @@
-# loranimo
+# loramino
