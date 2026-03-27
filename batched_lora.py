@@ -1,19 +1,28 @@
 import torch
 
 class BatchedLoRA(torch.nn.Module):
-    def __init__(self, linear_layer, num_adapters, rank, alpha):
+    def __init__(self,
+                linear_layer: torch.nn.Linear,
+                num_adapters: int = 1,
+                rank: int = 1,
+                alpha: float | torch.Tensor = 1.0,
+                device: torch.device = torch.device('cpu')):
         super().__init__()
-
         self.linear_layer = linear_layer
         self.num_adapters = num_adapters
         self.rank = rank
         self.alpha = alpha
+        if isinstance(alpha, float):
+            self.alpha = torch.tensor(alpha)
+        else:
+            assert_fail_str = f"Alpha must be a scalar or a tensor of shape ({num_adapters},), got {alpha.shape}"
+            assert alpha.shape == (num_adapters,), assert_fail_str
 
         # Gaussian noise
         self.A = torch.nn.Parameter(torch.randn(num_adapters, rank, linear_layer.in_features) * 0.01)
         # Zero
         self.B = torch.nn.Parameter(torch.zeros(num_adapters, linear_layer.out_features, rank))
-    
+        self.to(device)
     def forward(self, x):
         batch_size, seq_len, hidden_dim = x.shape
         device = x.device
