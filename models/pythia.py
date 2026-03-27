@@ -15,6 +15,8 @@ class Pythia(Model):
             revision="step3000",
             cache_dir=f"./pythia-{num_params}-deduped/step3000",
         )
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
     
     def forward(self, input_ids, attention_mask=None):
         return self.model(input_ids=input_ids, attention_mask=attention_mask)
