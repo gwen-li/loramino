@@ -2,6 +2,14 @@ import torch
 
 class BatchedLoRA(torch.nn.Module):
     def __init__(self, linear_layer, num_adapters, rank, alpha):
+        """Connects to the next available port.
+
+        Args:
+        linear_layer: A port value greater or equal to 1024.
+
+        Returns:
+        The new minimum port.
+        """
         super().__init__()
 
         self.linear_layer = linear_layer
@@ -9,10 +17,13 @@ class BatchedLoRA(torch.nn.Module):
         self.rank = rank
         self.alpha = alpha
 
+        noise = torch.randn(num_adapters, rank, linear_layer.in_features) * 0.01
+        zeros = torch.zeros(num_adapters, linear_layer.out_features, rank)
+
         # Gaussian noise
-        self.A = torch.nn.Parameter(torch.randn(num_adapters, rank, linear_layer.in_features) * 0.01)
+        self.A = torch.nn.Parameter(noise)
         # Zero
-        self.B = torch.nn.Parameter(torch.zeros(num_adapters, linear_layer.out_features, rank))
+        self.B = torch.nn.Parameter(zeros)
     
     def forward(self, x):
         batch_size, seq_len, hidden_dim = x.shape
