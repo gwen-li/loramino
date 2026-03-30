@@ -5,9 +5,6 @@ from torch.utils.data import DataLoader
 from utils.orca_math import OrcaMath
 from tqdm import tqdm
 
-
-
-
 def setup_model(config_options: dict):
     """ Loads the base model and replaces linear layers with BatchedLoRA modules,
         freezes the base model parameters.
@@ -19,10 +16,12 @@ def setup_model(config_options: dict):
             model (torch.nn.Module): The modified model with BatchedLoRA modules.
     """
     device = None
+
     if 'device' in config_options:
         device = torch.device(config_options['device'])
     else:
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+    
     model = load_model.load_model(config_options['base_model'])
     model.to(device)
     lora_config = config_options['lora_config']
@@ -51,12 +50,11 @@ def setup_model(config_options: dict):
 
     if config_options['verbose']:
         print(f"Replaced {num_lora_layers} linear layers with BatchedLoRA modules.")
-    return model
+    return model, device
 
 def train(config_options):
-    
     # Load base model
-    model = setup_model(config_options)
+    model, device = setup_model(config_options)
     data = config_options['dataset']
     dataloader = DataLoader(OrcaMath(data, model.tokenizer),
                             batch_size=config_options['batch_size'],
@@ -77,13 +75,26 @@ def train(config_options):
     loss_fn = loss_fn_dict[config_options['loss_function']]
     if config_options['verbose']:
         print(f"Starting training for {config_options['num_epochs']} epochs...")
+    
     for epoch in range(config_options['num_epochs']):
         for batch in tqdm(dataloader, desc=f"Epoch {epoch}"):
+            batch = {k : v.to(device) for k, v in batch.items()}
+
             optimizer.zero_grad()
-            outputs = model(batch)
-            loss = loss_fn(outputs, batch, reduction='none')
+
+            outputs = model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
+
+            logits = outputs.logits
+
+            shift_logits = logits[:, :-1, :].contiguous()
+            shift_labels = batch["labels"][:, 1:].contiguous()
+
+            loss = loss_fn(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
+
             loss.backward()
+
             optimizer.step()
+        
         if config_options['verbose']:
             print(f"Epoch {epoch+1}/{config_options['num_epochs']} completed. Loss: {loss.item()}")
     
