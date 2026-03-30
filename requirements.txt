@@ -1,6 +1,7 @@
+numpy
 torch
 transformers
+datasets
 pandas
 pyarrow
 tqdm
-

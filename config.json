@@ -1,0 +1,20 @@
+{
+  "base_model": "pythia-14m",
+  "dataset": "path/to/your_dataset.parquet",
+  "batch_size": 1,
+  "num_epochs": 1,
+  "num_adaptors": 1,
+  "learning_rate": 0.0001,
+  "adapter_type": "batched_lora",
+  "lora_config": {
+    "num_adapters": 1,
+    "rank": 4,
+    "alpha": 1.0
+  },
+  "optimizer": "adamw",
+  "optimizer_params": {
+    "lr": 0.0001
+  },
+  "loss_function": "cross_entropy",
+  "verbose": true
+}

@@ -75,6 +75,7 @@ def setup_model(config_options: dict):
         lora_config['alpha'] = torch.tensor(lora_config['alpha'])
     model.requires_grad_(False)
     num_lora_layers = _replace_linear_layers(model, adapter_type, lora_config, device)
+    model.to(device)
     if config_options['verbose']:
         print(f"Replaced {num_lora_layers} linear layers with {adapter_type} modules.")
 
@@ -85,6 +86,7 @@ def train(config_options):
 
     # Load base model
     model = setup_model(config_options)
+    device = next(model.parameters()).device
     data = config_options['dataset']
     dataloader = DataLoader(OrcaMath(data, model.tokenizer),
                             batch_size=config_options['batch_size'],
@@ -92,11 +94,11 @@ def train(config_options):
     optimizer_dict = {
         'adam': torch.optim.Adam,
         'sgd': torch.optim.SGD,
-        'adamw': torch.optim.AdamW,
-        'muon': torch.optim.Muon
+        'adamw': torch.optim.AdamW
     }
     optimizer_class = optimizer_dict[config_options['optimizer']]
-    optimizer = optimizer_class(model.parameters(), **config_options['optimizer_params'])
+    trainable_parameters = [parameter for parameter in model.parameters() if parameter.requires_grad]
+    optimizer = optimizer_class(trainable_parameters, **config_options['optimizer_params'])
     loss_fn_dict = {
         'mse': torch.nn.MSELoss(),
         'cross_entropy': torch.nn.CrossEntropyLoss(),
@@ -108,9 +110,10 @@ def train(config_options):
         print(f"Starting training for {config_options['num_epochs']} epochs...")
     for epoch in range(config_options['num_epochs']):
         for batch in tqdm(dataloader, desc=f"Epoch {epoch}"):
+            batch = {key: value.to(device) for key, value in batch.items()}
             optimizer.zero_grad()
-            outputs = model(batch)
-            loss = loss_fn(outputs, batch, reduction='none')
+            outputs = model(**batch)
+            loss = outputs.loss
             loss.backward()
             optimizer.step()
         if config_options['verbose']:
