@@ -1,4 +1,4 @@
-from .model import Model
+from .base import Model
 from .pythia import Pythia
 from typing import Callable
 
@@ -11,3 +11,4 @@ model_dict: dict[str, Callable[[], Model]] = {
     'pythia-410m': lambda: Pythia(num_params='410m'),
     'pythia-1b': lambda: Pythia(num_params='1b'),
 }
+
