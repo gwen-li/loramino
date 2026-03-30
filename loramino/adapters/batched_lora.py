@@ -1,5 +1,6 @@
 import torch
 
+
 class BatchedLoRA(torch.nn.Module):
     def __init__(self,
                 linear_layer: torch.nn.Linear,
@@ -11,21 +12,31 @@ class BatchedLoRA(torch.nn.Module):
         self.linear_layer = linear_layer
         self.num_adapters = num_adapters
         self.rank = rank
+        self.linear_layer.requires_grad_(False)
 
-        self.alpha = None
+        alpha_tensor = torch.as_tensor(alpha, dtype=linear_layer.weight.dtype, device=device)
+        if alpha_tensor.numel() == 1:
+            alpha_tensor = alpha_tensor.repeat(num_adapters)
+        elif alpha_tensor.shape != (num_adapters,):
+            raise ValueError(
+                f"Alpha must be a scalar or a tensor of shape ({num_adapters},), got {tuple(alpha_tensor.shape)}"
+            )
+        self.register_buffer("alpha", alpha_tensor)
 
-        if isinstance(alpha, float):
-            self.alpha = torch.full((num_adapters, ), alpha, device=device)
-        else:
-            assert_fail_str = f"Alpha must be a scalar or a tensor of shape ({num_adapters},), got {self.alpha.shape}"
-            assert self.alpha.shape == (num_adapters,), assert_fail_str
+        parameter_kwargs = {
+            "device": device,
+            "dtype": linear_layer.weight.dtype,
+        }
 
         # Gaussian noise
-        self.A = torch.nn.Parameter(torch.randn(num_adapters, rank, linear_layer.in_features) * 0.01)
+        self.A = torch.nn.Parameter(
+            torch.randn(num_adapters, rank, linear_layer.in_features, **parameter_kwargs) * 0.01
+        )
         # Zero
-        self.B = torch.nn.Parameter(torch.zeros(num_adapters, linear_layer.out_features, rank))
-        self.to(device)
-        
+        self.B = torch.nn.Parameter(
+            torch.zeros(num_adapters, linear_layer.out_features, rank, **parameter_kwargs)
+        )
+
     def forward(self, x):
         batch_size, seq_len, hidden_dim = x.shape
         device = x.device
@@ -46,9 +57,9 @@ class BatchedLoRA(torch.nn.Module):
         Ax = torch.bmm(A, x.unsqueeze(-1)).squeeze(-1)
         # BAx
         BAx = torch.bmm(B, Ax.unsqueeze(-1)).squeeze(-1)
-        
-        out = W0x + (self.alpha / self.rank) * BAx
+
+        scales = (self.alpha[adapter_ids] / self.rank).unsqueeze(-1)
+        out = W0x + scales * BAx
         out = out.reshape(batch_size, seq_len, -1)
 
         return out
-

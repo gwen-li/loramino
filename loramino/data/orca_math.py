@@ -16,17 +16,18 @@ class OrcaMath(Dataset):
         answers_tokenized = self.tokenize(answers_list)
         self.questions = questions_tokenized
         self.answers = answers_tokenized
-        
-    
+
+
     def tokenize(self, text_list):
         return self.tokenizer(text_list,
                               truncation=True,
                               padding='max_length',
                               return_tensors='pt')
-    
+
 
     def __len__(self):
         return len(self.questions)
 
     def __getitem__(self, idx):
         return (self.questions[idx], self.answers[idx])
+

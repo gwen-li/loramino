@@ -1,5 +1,6 @@
 from transformers import GPTNeoXForCausalLM, AutoTokenizer
-from .model import Model
+from .base import Model
+
 
 class Pythia(Model):
     def __init__(self, num_params: str):
@@ -17,11 +18,7 @@ class Pythia(Model):
         )
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-    
+
     def forward(self, input_ids, attention_mask=None):
         return self.model(input_ids=input_ids, attention_mask=attention_mask)
-        
-
-
-
 
