@@ -1,5 +1,5 @@
 import torch
-from .models.model_dict import model_dict
+from models.model_dict import model_dict
 
 def load_model(model_name, model_path=None):
   

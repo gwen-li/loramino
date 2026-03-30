@@ -1,6 +1,6 @@
 import argparse
 import json
-from train import train
+from train.train import train
 
 
 def validate_config(config):
@@ -13,7 +13,7 @@ def validate_config(config):
 
 def main():
     parser = argparse.ArgumentParser(description='Fine-tune base model with multiple datasets (or multiple copies of same) using batched LoRA')
-    parser.add_argument('--base_model', type=str, help='Base model to fine-tune', default='tinyllama')
+    parser.add_argument('--base_model', type=str, help='Base model to fine-tune', default='pythia-14m')
     parser.add_argument('--dataset', type=str, help='Dataset to fine-tune on')
     parser.add_argument('--batch_size', type=int, help='Batch size for fine-tuning')
     parser.add_argument('--num_epochs', type=int, help='Number of epochs for fine-tuning')
@@ -32,7 +32,6 @@ def main():
         print(json.dumps(config_options, indent=2))
     train(config_options)
     
-
-  
-  
+if __name__ == "__main__":
+    main()
   

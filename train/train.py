@@ -1,6 +1,6 @@
 import torch
 import load_model
-from batch import BatchedLoRA
+from .batched_lora import BatchedLoRA
 from torch.utils.data import DataLoader
 from utils.orca_math import OrcaMath
 from tqdm import tqdm
