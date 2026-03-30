@@ -26,8 +26,6 @@ def setup_model(config_options: dict):
     model = load_model.load_model(config_options['base_model'])
     lora_config = config_options['lora_config']
     
-    if (isinstance(lora_config['alpha'], float)):
-        lora_config['alpha'] = torch.tensor(lora_config['alpha'])
     num_lora_layers = 0
     for name, module in model.named_modules():
         module.requires_grad_(False)
