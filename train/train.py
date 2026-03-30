@@ -33,7 +33,7 @@ def setup_model(config_options: dict):
         module.requires_grad_(False)
         if isinstance(module, torch.nn.Linear):
             num_lora_layers += 1
-            setattr(model, name, BatchedLoRA(module, **lora_config + {'device': device})) 
+            setattr(model, name, BatchedLoRA(module, **{**lora_config, 'device': device})) 
     if config_options['verbose']:
         print(f"Replaced {num_lora_layers} linear layers with BatchedLoRA modules.")
     return model
