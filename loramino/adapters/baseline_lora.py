@@ -35,4 +35,3 @@ class BaselineLoRA(torch.nn.Module):
         Ax = torch.matmul(lora_input, self.A.transpose(-1, -2))
         BAx = torch.matmul(Ax, self.B.transpose(-1, -2))
         return base_output + (self.alpha / self.rank) * BAx
-
