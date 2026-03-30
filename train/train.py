@@ -24,6 +24,7 @@ def setup_model(config_options: dict):
     else:
         device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model = load_model.load_model(config_options['base_model'])
+    model.to(device)
     lora_config = config_options['lora_config']
     
     num_lora_layers = 0

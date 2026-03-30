@@ -1,14 +1,17 @@
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
-
+from datasets import load_dataset
 
 class OrcaMath(Dataset):
     def __init__(self, parquet_file, tokenizer):
-        data = pd.read_parquet(parquet_file)
+        # data = pd.read_parquet(parquet_file)
+
+        data = load_dataset("microsoft/orca-math-word-problems-200k")["train"]
+
         self.tokenizer = tokenizer
-        questions_list = data['questions'].tolist()
-        answers_list = data['answers'].tolist()
+        questions_list = data['question'].tolist()
+        answers_list = data['answer'].tolist()
         questions_tokenized = self.tokenize(questions_list)
         answers_tokenized = self.tokenize(answers_list)
         self.questions = questions_tokenized
