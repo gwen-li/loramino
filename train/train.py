@@ -27,11 +27,27 @@ def setup_model(config_options: dict):
     lora_config = config_options['lora_config']
     
     num_lora_layers = 0
+    
+    replace = []
+
     for name, module in model.named_modules():
-        module.requires_grad_(False)
-        if isinstance(module, torch.nn.Linear):
+        if isinstance(module, torch.nnLinear):
+            replace.append((name, module))
             num_lora_layers += 1
-            setattr(model, name, BatchedLoRA(module, **{**lora_config, 'device': device})) 
+    
+    for name, module in replace:
+        parts = name.split(".")
+        
+        parent_name = ".".join(parts[:-1])
+        child_name = name.split(".")[-1]
+
+        if parent_name:
+            parent = model.get_submodule(parent_name)
+        else:
+            parent = model
+        
+        setattr(parent, child_name, BatchedLoRA(module, **{**lora_config, 'device': device}))
+
     if config_options['verbose']:
         print(f"Replaced {num_lora_layers} linear layers with BatchedLoRA modules.")
     return model
