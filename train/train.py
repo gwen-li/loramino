@@ -32,7 +32,7 @@ def setup_model(config_options: dict):
     replace = []
 
     for name, module in model.named_modules():
-        if isinstance(module, torch.nnLinear):
+        if isinstance(module, torch.nn.Linear):
             replace.append((name, module))
             num_lora_layers += 1
     
