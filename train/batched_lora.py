@@ -9,30 +9,33 @@ class BatchedLoRA(torch.nn.Module):
                 device: torch.device = torch.device('cpu')):
         super().__init__()
         self.linear_layer = linear_layer
+        self.device = linear_layer.weight.device
+        self.dtype = linear_layer.weight.dtype
         self.num_adapters = num_adapters
         self.rank = rank
 
         self.alpha = None
 
         if isinstance(alpha, float):
-            self.alpha = torch.full((num_adapters, ), alpha, device=device)
+            self.alpha = torch.full((num_adapters, ), alpha, device=self.device, dtype=self.dtype)
         else:
             assert_fail_str = f"Alpha must be a scalar or a tensor of shape ({num_adapters},), got {self.alpha.shape}"
             assert self.alpha.shape == (num_adapters,), assert_fail_str
 
         # Gaussian noise
-        self.A = torch.nn.Parameter(torch.randn(num_adapters, rank, linear_layer.in_features) * 0.01)
+        self.A = torch.nn.Parameter(torch.randn(num_adapters, rank, linear_layer.in_features, device=self.device, dtype=self.dtype) * 0.01)
         # Zero
-        self.B = torch.nn.Parameter(torch.zeros(num_adapters, linear_layer.out_features, rank))
-        self.to(device)
+        self.B = torch.nn.Parameter(torch.zeros(num_adapters, linear_layer.out_features, rank, device=self.device, dtype=self.dtype))
         
     def forward(self, x):
+        x = x.to(self.device)
+        x = x.to(self.dtype)
+        
         batch_size, seq_len, hidden_dim = x.shape
-        device = x.device
 
         x = x.reshape(batch_size * seq_len, hidden_dim)
 
-        adapter_ids = torch.arange(batch_size, device=device) % self.num_adapters
+        adapter_ids = torch.arange(batch_size, device=self.device) % self.num_adapters
         adapter_ids = adapter_ids.repeat_interleave(seq_len)
 
         # FIX
