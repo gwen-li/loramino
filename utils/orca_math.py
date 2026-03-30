@@ -35,7 +35,8 @@ class OrcaMath(Dataset):
         tokenized = self.tokenizer(
             text,
             truncation=True,
-            padding=True,
+            padding="max_length",
+            max_length=512,
             return_tensors="pt"
         )
 
