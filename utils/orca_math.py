@@ -5,9 +5,7 @@ from datasets import load_dataset
 
 class OrcaMath(Dataset):
     def __init__(self, parquet_file, tokenizer):
-        # data = pd.read_parquet(parquet_file)
-
-        data = load_dataset("microsoft/orca-math-word-problems-200k")["train"]
+        data = pd.read_parquet(parquet_file)
 
         self.tokenizer = tokenizer
         questions_list = data['question'].tolist()
