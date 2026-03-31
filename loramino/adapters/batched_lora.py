@@ -36,30 +36,34 @@ class BatchedLoRA(torch.nn.Module):
         self.B = torch.nn.Parameter(
             torch.zeros(num_adapters, linear_layer.out_features, rank, **parameter_kwargs)
         )
+        self.active_adapter_ids = None
+
+    def _resolve_adapter_ids(self, batch_size: int, device: torch.device) -> torch.Tensor:
+        if self.active_adapter_ids is None:
+            return torch.arange(batch_size, device=device) % self.num_adapters
+
+        adapter_ids = self.active_adapter_ids.to(device=device)
+        if adapter_ids.shape != (batch_size,):
+            raise ValueError(
+                f"adapter_ids must have shape ({batch_size},), got {tuple(adapter_ids.shape)}"
+            )
+        return adapter_ids
 
     def forward(self, x):
         batch_size, seq_len, hidden_dim = x.shape
         device = x.device
 
-        x = x.reshape(batch_size * seq_len, hidden_dim)
+        adapter_ids = self._resolve_adapter_ids(batch_size, device)
+        token_adapter_ids = adapter_ids.repeat_interleave(seq_len)
 
-        adapter_ids = torch.arange(batch_size, device=device) % self.num_adapters
-        adapter_ids = adapter_ids.repeat_interleave(seq_len)
+        flat_x = x.reshape(batch_size * seq_len, hidden_dim).to(dtype=self.A.dtype)
+        A = self.A.index_select(0, token_adapter_ids)
+        B = self.B.index_select(0, token_adapter_ids)
 
-        # FIX
-        ## Inefficient - Change to group
-        A = self.A[adapter_ids]
-        B = self.B[adapter_ids]
-
-        W0x = self.linear_layer(x)
-
-        # Ax
-        Ax = torch.bmm(A, x.unsqueeze(-1)).squeeze(-1)
-        # BAx
+        base_output = self.linear_layer(x)
+        Ax = torch.bmm(A, flat_x.unsqueeze(-1)).squeeze(-1)
         BAx = torch.bmm(B, Ax.unsqueeze(-1)).squeeze(-1)
+        scales = (self.alpha.index_select(0, token_adapter_ids) / self.rank).unsqueeze(-1)
+        lora_output = (BAx * scales).reshape(batch_size, seq_len, -1).to(dtype=base_output.dtype)
 
-        scales = (self.alpha[adapter_ids] / self.rank).unsqueeze(-1)
-        out = W0x + scales * BAx
-        out = out.reshape(batch_size, seq_len, -1)
-
-        return out
+        return base_output + lora_output
