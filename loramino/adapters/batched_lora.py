@@ -57,6 +57,8 @@ class BatchedLoRA(torch.nn.Module):
         token_adapter_ids = adapter_ids.repeat_interleave(seq_len)
 
         flat_x = x.reshape(batch_size * seq_len, hidden_dim).to(dtype=self.A.dtype)
+
+        # TODO (Gwen): A and B are still being duplicated
         A = self.A.index_select(0, token_adapter_ids)
         B = self.B.index_select(0, token_adapter_ids)
 
