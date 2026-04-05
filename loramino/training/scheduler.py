@@ -36,7 +36,7 @@ def compute_rank_groups(ranks: list[int],
                 break
             min_size_found, partition = dp_helper(current_index + group_size)
             score = min(group_size, min_size_found)
-            if score > best_score:
+            if score >= best_score:
                 best_score = score
                 best_partition = partition
                 best_partition.append([idx for idx, _ in sorted_ranks[current_index:current_index + group_size]])
