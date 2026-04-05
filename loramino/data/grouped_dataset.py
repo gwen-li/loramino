@@ -1,6 +1,6 @@
 from torch.utils.data import Dataset
 import torch
-from . import dataset_dict
+from ...utils import dataset_dict
 
 class GroupedDataset(Dataset):
     def __init__(self, datasets: Dataset | list[Dataset]):
