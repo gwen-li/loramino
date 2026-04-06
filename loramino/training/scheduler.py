@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 def compute_rank_groups(ranks: list[int],
                         min_group_size: int = 1,
                         max_group_size: int = 16,
@@ -22,11 +24,14 @@ def compute_rank_groups(ranks: list[int],
     ranks_with_indices = list(enumerate(ranks))
     sorted_ranks = sorted(ranks_with_indices, key=lambda x: x[1])
     partition_groups = []
-    def dp_helper(current_index: int) -> tuple[int, list]:
+    dp_cache = [None for _ in range(len(sorted_ranks))]
+    def dp_helper(current_index: int) -> tuple[int, int]:
         if current_index >= len(sorted_ranks): return (max_group_size, [])
+        if dp_cache[current_index]:
+            return dp_cache[current_index]
         min_size = min(min_group_size, len(sorted_ranks) - current_index)
         best_score = -1
-        best_partition = []
+        best_partition = -1
         for group_size in range(min_size, max_group_size + 1):
             if current_index + group_size > len(sorted_ranks):
                 break
@@ -38,11 +43,16 @@ def compute_rank_groups(ranks: list[int],
             score = min(group_size, min_size_found)
             if score >= best_score:
                 best_score = score
-                best_partition = partition
-                best_partition.append([idx for idx, _ in sorted_ranks[current_index:current_index + group_size]])
+                best_partition = current_index + group_size
         if best_score == -1:
-            return 1, [[sorted_ranks[current_index][0]]] + dp_helper(current_index + 1)[1]
+            return 1, current_index + 1
+        dp_cache[current_index] = (best_score, best_partition)
         return best_score, best_partition
-    _, partition_groups = dp_helper(0)
-    return partition_groups[::-1]
+    dp_helper(0)
+    current_index = 0
+    while current_index < len(sorted_ranks):
+        _, next_index = dp_cache[current_index]
+        partition_groups.append([index for index, _ in sorted_ranks[current_index:next_index]])
+        current_index = next_index
+    return partition_groups
     
