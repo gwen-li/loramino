@@ -5,13 +5,25 @@ class BatchedLoRA(torch.nn.Module):
     def __init__(self,
                 linear_layer: torch.nn.Linear,
                 num_adapters: int = 1,
-                rank: int = 1,
+                rank: int | list[int] = 1,
                 alpha: float | torch.Tensor = 1.0,
                 device: torch.device = torch.device('cpu')):
         super().__init__()
         self.linear_layer = linear_layer
         self.num_adapters = num_adapters
-        self.rank = rank
+        
+        if isinstance(rank, int):
+            self.ranks = [rank] * num_adapters
+        else:
+            if len(rank) != num_adapters:
+                raise ValueError(
+                    f"Expected {num_adapters} ranks, got {len(rank)}"
+                )
+        
+            self.ranks = list(rank)
+        
+        self.max_rank = max(self.ranks)
+
         self.linear_layer.requires_grad_(False)
 
         alpha_tensor = torch.as_tensor(alpha, dtype=linear_layer.weight.dtype, device=device)
@@ -21,7 +33,10 @@ class BatchedLoRA(torch.nn.Module):
             raise ValueError(
                 f"Alpha must be a scalar or a tensor of shape ({num_adapters},), got {tuple(alpha_tensor.shape)}"
             )
-        self.register_buffer("alpha", alpha_tensor)
+        self.register_buffer("alpha_tensor", alpha_tensor)
+
+        rank_tensor = torch.as_tensor(self.ranks, dtype=linear_layer.weight.dtype, device=device)
+        self.register_buffer("rank_tensor", rank_tensor)
 
         parameter_kwargs = {
             "device": device,
@@ -30,11 +45,11 @@ class BatchedLoRA(torch.nn.Module):
 
         # Gaussian noise
         self.A = torch.nn.Parameter(
-            torch.randn(num_adapters, rank, linear_layer.in_features, **parameter_kwargs) * 0.01
+            torch.randn(num_adapters, self.max_rank, linear_layer.in_features, **parameter_kwargs) * 0.01
         )
         # Zero
         self.B = torch.nn.Parameter(
-            torch.zeros(num_adapters, linear_layer.out_features, rank, **parameter_kwargs)
+            torch.zeros(num_adapters, linear_layer.out_features, self.max_rank, **parameter_kwargs)
         )
         self.active_adapter_ids = None
 
@@ -65,7 +80,7 @@ class BatchedLoRA(torch.nn.Module):
         base_output = self.linear_layer(x)
         Ax = torch.bmm(A, flat_x.unsqueeze(-1)).squeeze(-1)
         BAx = torch.bmm(B, Ax.unsqueeze(-1)).squeeze(-1)
-        scales = (self.alpha.index_select(0, token_adapter_ids) / self.rank).unsqueeze(-1)
+        scales = (self.alpha_tensor.index_select(0, token_adapter_ids) / self.rank_tensor.index_select(0, token_adapter_ids)).unsqueeze(-1)
         lora_output = (BAx * scales).reshape(batch_size, seq_len, -1).to(dtype=base_output.dtype)
 
         return base_output + lora_output
