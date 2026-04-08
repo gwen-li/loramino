@@ -1,5 +1,5 @@
 import torch
-
+from .scheduler import compute_rank_groups
 
 class BatchedLoRA(torch.nn.Module):
     def __init__(self,
@@ -23,6 +23,13 @@ class BatchedLoRA(torch.nn.Module):
             self.ranks = list(rank)
         
         self.max_rank = max(self.ranks)
+
+        self.rank_groups = compute_rank_groups(self.ranks)
+        grouped_adapters = torch.empty(num_adapters, dtype=torch.long)
+        for i, group in enumerate(self.rank_groups):
+            for adapter_id in group:
+                grouped_adapters[adapter_id] = i
+        self.register_buffer("grouped_adapters_tensor", grouped_adapters)
 
         self.linear_layer.requires_grad_(False)
 
@@ -73,14 +80,30 @@ class BatchedLoRA(torch.nn.Module):
 
         flat_x = x.reshape(batch_size * seq_len, hidden_dim).to(dtype=self.A.dtype)
 
-        # TODO (Gwen): A and B are still being duplicated
-        A = self.A.index_select(0, token_adapter_ids)
-        B = self.B.index_select(0, token_adapter_ids)
-
         base_output = self.linear_layer(x)
-        Ax = torch.bmm(A, flat_x.unsqueeze(-1)).squeeze(-1)
-        BAx = torch.bmm(B, Ax.unsqueeze(-1)).squeeze(-1)
-        scales = (self.alpha_tensor.index_select(0, token_adapter_ids) / self.rank_tensor.index_select(0, token_adapter_ids)).unsqueeze(-1)
-        lora_output = (BAx * scales).reshape(batch_size, seq_len, -1).to(dtype=base_output.dtype)
+
+        flat_output = torch.zeros(flat_x.shape[0], self.linear_layer.out_features, device=device, dtype=self.A.dtype)
+
+        group_ids = self.grouped_adapters_tensor.index_select(0, token_adapter_ids)
+
+        for group_id in group_ids.unique():
+            indices = (group_ids == group_id).nonzero(as_tuple=True)[0]
+
+            group_adapter_ids = token_adapter_ids[indices]
+            group_rank = int(self.rank_tensor[group_adapter_ids].max().item())
+
+            A = self.A.index_select(0, group_adapter_ids)[:, :group_rank, :]
+            B = self.B.index_select(0, group_adapter_ids)[:, :, :group_rank]
+
+            x_group = flat_x[indices]
+
+            Ax = torch.bmm(A, x_group.unsqueeze(-1)).squeeze(-1)
+            BAx = torch.bmm(B, Ax.unsqueeze(-1)).squeeze(-1)
+
+            scales = (self.alpha_tensor.index_select(0, group_adapter_ids) / self.rank_tensor.index_select(0, group_adapter_ids)).unsqueeze(-1)
+
+            flat_output[indices] = BAx * scales
+
+        lora_output = flat_output.reshape(batch_size, seq_len, -1).to(dtype=base_output.dtype)
 
         return base_output + lora_output
