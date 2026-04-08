@@ -31,7 +31,7 @@ def compute_rank_groups(ranks: list[int],
         if current_index >= len(sorted_ranks): return (max_group_size, [])
         if dp_cache[current_index]:
             return dp_cache[current_index]
-        while curr_min_size > 1:
+        while curr_min_size >= 1:
             min_size = min(curr_min_size, len(sorted_ranks) - current_index)
             best_score = -1
             best_partition = -1
