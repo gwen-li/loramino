@@ -92,6 +92,7 @@ class BatchedLoRA(torch.nn.Module):
             group_adapter_ids = token_adapter_ids[indices]
             group_rank = int(self.rank_tensor[group_adapter_ids].max().item())
 
+            # TODO (Gwen): A and B are still being duplicated :(
             A = self.A.index_select(0, group_adapter_ids)[:, :group_rank, :]
             B = self.B.index_select(0, group_adapter_ids)[:, :, :group_rank]
 
