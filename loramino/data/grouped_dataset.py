@@ -37,6 +37,19 @@ class DatasetJobSpec:
     max_length: int
 
 
+@dataclass(frozen=True)
+class TrainingJob:
+    """Runtime-ready job description used by the data layer and scheduler."""
+
+    name: str
+    adapter_id: int
+    dataset_type: str
+    dataset_path: str
+    max_length: int
+    rank: int
+    alpha: float
+
+
 class JobDataset(Dataset):
     """Wrap one dataset with the adapter id that should consume its examples."""
 
@@ -56,21 +69,29 @@ class JobDataset(Dataset):
 class GroupedDataset(Dataset):
     """Simple round-robin view across multiple job-local datasets."""
 
-    def __init__(self, job_datasets: list[JobDataset]):
+    def __init__(self, job_datasets: list[JobDataset], job_groups: list[list[int]] | None = None):
         if not job_datasets:
             raise ValueError("GroupedDataset requires at least one job dataset.")
 
         self.job_datasets = job_datasets
-        self.index_map = self._build_round_robin_index(job_datasets)
+        self.index_map = self._build_round_robin_index(job_datasets, job_groups)
 
     @staticmethod
-    def _build_round_robin_index(job_datasets: list[JobDataset]) -> list[tuple[int, int]]:
+    def _build_round_robin_index(
+        job_datasets: list[JobDataset],
+        job_groups: list[list[int]] | None,
+    ) -> list[tuple[int, int]]:
+        if job_groups is None:
+            job_groups = [list(range(len(job_datasets)))]
+
         index_map = []
-        max_length = max(len(dataset) for dataset in job_datasets)
-        for local_index in range(max_length):
-            for job_index, dataset in enumerate(job_datasets):
-                if local_index < len(dataset):
-                    index_map.append((job_index, local_index))
+        for job_group in job_groups:
+            max_length = max(len(job_datasets[job_index]) for job_index in job_group)
+            for local_index in range(max_length):
+                for job_index in job_group:
+                    dataset = job_datasets[job_index]
+                    if local_index < len(dataset):
+                        index_map.append((job_index, local_index))
         return index_map
 
     def __len__(self):
@@ -128,6 +149,33 @@ def _coerce_job_spec(
     )
 
 
+def _get_num_adapters(config_options: dict) -> int:
+    lora_num_adapters = config_options.get("lora_config", {}).get("num_adapters")
+    if lora_num_adapters is not None:
+        return lora_num_adapters
+    return config_options.get("num_adaptors", 1)
+
+
+def _resolve_adapter_value(
+    value,
+    *,
+    adapter_id: int,
+    num_adapters: int,
+    field_name: str,
+):
+    if isinstance(value, tuple):
+        value = list(value)
+
+    if isinstance(value, list):
+        if len(value) != num_adapters:
+            raise ValueError(
+                f"Expected {num_adapters} values for lora_config.{field_name}, got {len(value)}."
+            )
+        return value[adapter_id]
+
+    return value
+
+
 def build_dataset_job_specs(config_options: dict) -> list[DatasetJobSpec]:
     # ``jobs`` is the preferred config surface. ``dataset_jobs`` and bare
     # ``dataset`` are supported so older configs still work.
@@ -161,34 +209,85 @@ def build_dataset_job_specs(config_options: dict) -> list[DatasetJobSpec]:
     return job_specs
 
 
-def _build_base_dataset(job_spec: DatasetJobSpec, tokenizer) -> Dataset:
-    dataset_class = DATASET_REGISTRY.get(job_spec.dataset_type)
+def build_training_jobs(config_options: dict) -> list[TrainingJob]:
+    num_adapters = _get_num_adapters(config_options)
+    lora_config = config_options.get("lora_config", {})
+    default_rank = lora_config.get("rank", 1)
+    default_alpha = lora_config.get("alpha", 1.0)
+
+    jobs = []
+    for index, job_spec in enumerate(build_dataset_job_specs(config_options)):
+        raw_jobs = config_options.get("jobs") or config_options.get("dataset_jobs")
+        raw_job_config = raw_jobs[index] if isinstance(raw_jobs, list) and index < len(raw_jobs) else None
+
+        job_name = f"job_{job_spec.adapter_id}"
+        job_rank = _resolve_adapter_value(
+            default_rank,
+            adapter_id=job_spec.adapter_id,
+            num_adapters=num_adapters,
+            field_name="rank",
+        )
+        job_alpha = _resolve_adapter_value(
+            default_alpha,
+            adapter_id=job_spec.adapter_id,
+            num_adapters=num_adapters,
+            field_name="alpha",
+        )
+
+        if isinstance(raw_job_config, dict):
+            job_name = raw_job_config.get("name", job_name)
+            job_rank = raw_job_config.get("rank", job_rank)
+            job_alpha = raw_job_config.get("alpha", job_alpha)
+
+        jobs.append(
+            TrainingJob(
+                name=job_name,
+                adapter_id=job_spec.adapter_id,
+                dataset_type=job_spec.dataset_type,
+                dataset_path=job_spec.dataset_path,
+                max_length=job_spec.max_length,
+                rank=int(job_rank),
+                alpha=float(job_alpha),
+            )
+        )
+
+    return jobs
+
+
+def _build_base_dataset(job: TrainingJob, tokenizer) -> Dataset:
+    dataset_class = DATASET_REGISTRY.get(job.dataset_type)
     if dataset_class is None:
         valid_types = ", ".join(sorted(DATASET_REGISTRY))
         raise ValueError(
-            f"Unknown dataset_type '{job_spec.dataset_type}'. Expected one of: {valid_types}"
+            f"Unknown dataset_type '{job.dataset_type}'. Expected one of: {valid_types}"
         )
     return dataset_class(
-        job_spec.dataset_path,
+        job.dataset_path,
         tokenizer,
-        max_length=job_spec.max_length,
+        max_length=job.max_length,
     )
 
 
-def build_training_dataset(config_options: dict, tokenizer) -> Dataset:
+def build_training_dataset(
+    config_options: dict,
+    tokenizer,
+    *,
+    jobs: list[TrainingJob] | None = None,
+    job_groups: list[list[int]] | None = None,
+) -> Dataset:
     # Grouping is intentionally lightweight here: we normalize job config,
     # build one dataset per job, and only interleave them if there are multiple.
-    job_specs = build_dataset_job_specs(config_options)
-    if len(job_specs) > 1:
-        max_lengths = {job_spec.max_length for job_spec in job_specs}
+    jobs = build_training_jobs(config_options) if jobs is None else list(jobs)
+    if len(jobs) > 1:
+        max_lengths = {job.max_length for job in jobs}
         if len(max_lengths) != 1:
             raise ValueError(
                 "Grouped training currently requires all jobs to use the same max_length."
             )
 
     job_datasets = [
-        JobDataset(_build_base_dataset(job_spec, tokenizer), adapter_id=job_spec.adapter_id)
-        for job_spec in job_specs
+        JobDataset(_build_base_dataset(job, tokenizer), adapter_id=job.adapter_id)
+        for job in jobs
     ]
 
     if len(job_datasets) == 1 and config_options.get("jobs") is None and config_options.get("dataset_jobs") is None:
@@ -197,7 +296,7 @@ def build_training_dataset(config_options: dict, tokenizer) -> Dataset:
     if len(job_datasets) == 1:
         return job_datasets[0]
 
-    return GroupedDataset(job_datasets)
+    return GroupedDataset(job_datasets, job_groups=job_groups)
 
 
 def grouped_batch_collator(examples: list[dict]) -> dict[str, torch.Tensor]:

@@ -13,7 +13,7 @@ reuse the same execution code.
 """
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from time import perf_counter
 
 import torch
@@ -22,11 +22,13 @@ from torch.utils.data import DataLoader
 from loramino.adapters.baseline_lora import BaselineLoRA
 from loramino.adapters.batched_lora import BatchedLoRA
 from loramino.data import (
-    build_dataset_job_specs,
+    TrainingJob,
+    build_training_jobs,
     build_training_dataset,
     grouped_batch_collator,
 )
 from loramino.models import loader as load_model
+from .scheduler import RankAwareScheduler, ScheduledJobGroup
 
 
 ADAPTER_REGISTRY = {
@@ -45,6 +47,8 @@ class TrainingState:
     device: torch.device
     adapter_type: str
     num_adapters: int
+    jobs: list[TrainingJob]
+    job_groups: list[ScheduledJobGroup]
     multi_adapter_baseline: bool
     optimizer: torch.optim.Optimizer | None = None
     baseline_optimizers: list[torch.optim.Optimizer] | None = None
@@ -101,6 +105,7 @@ def _build_adapter(
 
     if adapter_class is BaselineLoRA:
         adapter_kwargs.pop("num_adapters", None)
+        adapter_kwargs.pop("rank_groups", None)
 
     return adapter_class(linear_layer, **adapter_kwargs)
 
@@ -121,10 +126,85 @@ def _replace_linear_layers(
     return replaced
 
 
-def build_dataloader(config_options: dict, tokenizer, shuffle: bool = True) -> DataLoader:
+def _expand_per_adapter_value(value, num_adapters: int, field_name: str) -> list:
+    if isinstance(value, tuple):
+        value = list(value)
+
+    if isinstance(value, list):
+        if len(value) != num_adapters:
+            raise ValueError(
+                f"Expected {num_adapters} values for lora_config.{field_name}, got {len(value)}."
+            )
+        return list(value)
+
+    return [value] * num_adapters
+
+
+def build_training_jobs_and_groups(
+    config_options: dict,
+) -> tuple[list[TrainingJob], list[ScheduledJobGroup]]:
+    jobs = build_training_jobs(config_options)
+    scheduler = RankAwareScheduler.from_config(config_options)
+    return jobs, scheduler.group_jobs(jobs)
+
+
+def normalize_lora_config_for_jobs(
+    config_options: dict,
+    jobs: list[TrainingJob],
+    job_groups: list[ScheduledJobGroup],
+    *,
+    adapter_type: str,
+    num_adapters: int,
+) -> dict:
+    lora_config = dict(config_options["lora_config"])
+    rank_values = _expand_per_adapter_value(lora_config.get("rank", 1), num_adapters, "rank")
+    alpha_values = _expand_per_adapter_value(lora_config.get("alpha", 1.0), num_adapters, "alpha")
+
+    for job in jobs:
+        rank_values[job.adapter_id] = job.rank
+        alpha_values[job.adapter_id] = job.alpha
+
+    if adapter_type in {"baseline", "baseline_lora"}:
+        unique_ranks = set(rank_values)
+        unique_alphas = set(alpha_values)
+        if num_adapters > 1 and (len(unique_ranks) > 1 or len(unique_alphas) > 1):
+            raise ValueError(
+                "Multi-adapter baseline currently requires all jobs to share the same rank and alpha."
+            )
+        lora_config["rank"] = rank_values[0]
+        lora_config["alpha"] = alpha_values[0]
+        return lora_config
+
+    lora_config["rank"] = rank_values if num_adapters > 1 else rank_values[0]
+    lora_config["alpha"] = alpha_values if num_adapters > 1 else alpha_values[0]
+    configured_groups = [list(group.adapter_ids) for group in job_groups]
+    covered_adapter_ids = {adapter_id for group in configured_groups for adapter_id in group}
+    for adapter_id in range(num_adapters):
+        if adapter_id not in covered_adapter_ids:
+            configured_groups.append([adapter_id])
+    lora_config["rank_groups"] = configured_groups
+    return lora_config
+
+
+def build_dataloader(
+    config_options: dict,
+    tokenizer,
+    shuffle: bool = True,
+    *,
+    jobs: list[TrainingJob] | None = None,
+    job_groups: list[ScheduledJobGroup] | None = None,
+) -> DataLoader:
     # The data layer owns job-local datasets and batch collation. The runtime
     # only needs a standard DataLoader that may already carry adapter routing.
-    dataset = build_training_dataset(config_options, tokenizer)
+    if jobs is None or job_groups is None:
+        jobs, job_groups = build_training_jobs_and_groups(config_options)
+
+    dataset = build_training_dataset(
+        config_options,
+        tokenizer,
+        jobs=jobs,
+        job_groups=[list(group.job_indices) for group in job_groups],
+    )
     generator = None
     if shuffle and config_options.get("seed") is not None:
         generator = torch.Generator()
@@ -139,14 +219,13 @@ def build_dataloader(config_options: dict, tokenizer, shuffle: bool = True) -> D
     )
 
 
-def validate_job_adapter_ids(config_options: dict, num_adapters: int) -> None:
+def validate_job_adapter_ids(jobs: list[TrainingJob], num_adapters: int) -> None:
     # Jobs are allowed to choose adapter ids explicitly, but they must still fit
     # inside the configured adapter bank for the current run.
-    job_specs = build_dataset_job_specs(config_options)
-    for job_spec in job_specs:
-        if job_spec.adapter_id < 0 or job_spec.adapter_id >= num_adapters:
+    for job in jobs:
+        if job.adapter_id < 0 or job.adapter_id >= num_adapters:
             raise ValueError(
-                f"Job adapter_id {job_spec.adapter_id} is out of range for num_adapters={num_adapters}."
+                f"Job adapter_id {job.adapter_id} is out of range for num_adapters={num_adapters}."
             )
 
 
@@ -330,12 +409,21 @@ def setup_model(config_options: dict):
 
 
 def create_training_state(config_options: dict) -> TrainingState:
+    runtime_config = deepcopy(config_options)
     seed = config_options.get("seed")
     set_seed(seed)
 
-    adapter_type = normalize_adapter_type(config_options)
-    num_adapters = get_num_adapters(config_options)
-    validate_job_adapter_ids(config_options, num_adapters)
+    adapter_type = normalize_adapter_type(runtime_config)
+    num_adapters = get_num_adapters(runtime_config)
+    jobs, job_groups = build_training_jobs_and_groups(runtime_config)
+    validate_job_adapter_ids(jobs, num_adapters)
+    runtime_config["lora_config"] = normalize_lora_config_for_jobs(
+        runtime_config,
+        jobs,
+        job_groups,
+        adapter_type=adapter_type,
+        num_adapters=num_adapters,
+    )
     multi_adapter_baseline = adapter_type == "baseline_lora" and num_adapters > 1
 
     baseline_adapter_states = None
@@ -343,23 +431,25 @@ def create_training_state(config_options: dict) -> TrainingState:
         # Reference baseline mode keeps one model in memory, but stores private
         # adapter/optimizer state per logical job so correctness can be compared
         # against the batched path.
-        baseline_adapter_states = build_matched_baseline_adapter_states(config_options, num_adapters)
+        baseline_adapter_states = build_matched_baseline_adapter_states(runtime_config, num_adapters)
         set_seed(seed)
 
-    model = setup_model(config_options)
+    model = setup_model(runtime_config)
     device = next(model.parameters()).device
 
-    optimizer = None if multi_adapter_baseline else build_optimizer(model, config_options)
+    optimizer = None if multi_adapter_baseline else build_optimizer(model, runtime_config)
     baseline_optimizers = None
     if baseline_adapter_states is not None:
         load_baseline_adapter_state(model, baseline_adapter_states[0])
-        baseline_optimizers = [build_optimizer(model, config_options) for _ in range(num_adapters)]
+        baseline_optimizers = [build_optimizer(model, runtime_config) for _ in range(num_adapters)]
 
     return TrainingState(
         model=model,
         device=device,
         adapter_type=adapter_type,
         num_adapters=num_adapters,
+        jobs=jobs,
+        job_groups=job_groups,
         multi_adapter_baseline=multi_adapter_baseline,
         optimizer=optimizer,
         baseline_optimizers=baseline_optimizers,
@@ -506,6 +596,8 @@ def build_lora_checkpoint(state: TrainingState, config_options: dict, metrics: d
         "base_model": config_options["base_model"],
         "adapter_type": state.adapter_type,
         "num_adapters": state.num_adapters,
+        "jobs": [asdict(job) for job in state.jobs],
+        "job_groups": [asdict(group) for group in state.job_groups],
         "lora_config": deepcopy(config_options["lora_config"]),
         "config": deepcopy(config_options),
     }

@@ -2,7 +2,9 @@ from .grouped_dataset import (
     DatasetJobSpec,
     GroupedDataset,
     JobDataset,
+    TrainingJob,
     build_dataset_job_specs,
+    build_training_jobs,
     build_training_dataset,
     grouped_batch_collator,
 )
@@ -15,7 +17,9 @@ __all__ = [
     "JobDataset",
     "OrcaMath",
     "TinyOrcaMath",
+    "TrainingJob",
     "build_dataset_job_specs",
+    "build_training_jobs",
     "build_training_dataset",
     "grouped_batch_collator",
 ]

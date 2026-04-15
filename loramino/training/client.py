@@ -70,11 +70,21 @@ class TrainingClient:
     def device(self):
         return self.state.device
 
+    @property
+    def jobs(self):
+        return self.state.jobs
+
     def get_tokenizer(self):
         return self.tokenizer
 
     def build_dataloader(self, shuffle: bool = True):
-        return build_dataloader(self.config_options, self.tokenizer, shuffle=shuffle)
+        return build_dataloader(
+            self.config_options,
+            self.tokenizer,
+            shuffle=shuffle,
+            jobs=self.state.jobs,
+            job_groups=self.state.job_groups,
+        )
 
     def forward_backward(self, batch: dict) -> ForwardBackwardResult:
         result = runtime_forward_backward(self.state, batch)

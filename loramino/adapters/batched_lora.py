@@ -15,6 +15,7 @@ class BatchedLoRA(torch.nn.Module):
                 num_adapters: int = 1,
                 rank: int | list[int] = 1,
                 alpha: float | torch.Tensor = 1.0,
+                rank_groups: list[list[int]] | None = None,
                 device: torch.device = torch.device('cpu')):
         super().__init__()
         self.linear_layer = linear_layer
@@ -29,10 +30,10 @@ class BatchedLoRA(torch.nn.Module):
                 )
         
             self.ranks = list(rank)
-        
+
         self.max_rank = max(self.ranks)
 
-        self.rank_groups = compute_rank_groups(self.ranks)
+        self.rank_groups = list(map(list, rank_groups)) if rank_groups is not None else compute_rank_groups(self.ranks)
         grouped_adapters = torch.empty(num_adapters, dtype=torch.long)
         for i, group in enumerate(self.rank_groups):
             for adapter_id in group:
