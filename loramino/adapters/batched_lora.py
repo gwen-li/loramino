@@ -1,5 +1,13 @@
+"""Batched LoRA module for shared-backbone multi-adapter execution.
+
+Each linear layer keeps one bank of adapter weights, but the forward pass routes
+each example to its adapter id. Adapters with similar ranks are processed in
+groups so the batched path wastes less work on padding.
+"""
+
 import torch
 from .scheduler import compute_rank_groups
+
 
 class BatchedLoRA(torch.nn.Module):
     def __init__(self,
@@ -86,6 +94,9 @@ class BatchedLoRA(torch.nn.Module):
 
         group_ids = self.grouped_adapters_tensor.index_select(0, token_adapter_ids)
 
+        # Tokens are first routed by adapter id, then co-processed by rank group.
+        # That keeps per-adapter identity intact while still letting similar
+        # adapters share one batched matrix path.
         for group_id in group_ids.unique():
             indices = (group_ids == group_id).nonzero(as_tuple=True)[0]
 

@@ -1,3 +1,17 @@
+"""Shared training runtime for both baseline and grouped LoRA experiments.
+
+The main idea is:
+- config describes jobs, adapters, and optimizer settings
+- the data layer emits normal model tensors plus optional ``adapter_ids``
+- the runtime decides whether to train as:
+  1. one normal LoRA adapter
+  2. a multi-adapter baseline reference path
+  3. a batched/grouped LoRA path over one shared backbone
+
+This keeps the user-facing API small while letting training and benchmarking
+reuse the same execution code.
+"""
+
 from copy import deepcopy
 from dataclasses import dataclass
 from time import perf_counter
@@ -7,7 +21,11 @@ from torch.utils.data import DataLoader
 
 from loramino.adapters.baseline_lora import BaselineLoRA
 from loramino.adapters.batched_lora import BatchedLoRA
-from loramino.data.orca_math import OrcaMath
+from loramino.data import (
+    build_dataset_job_specs,
+    build_training_dataset,
+    grouped_batch_collator,
+)
 from loramino.models import loader as load_model
 
 
@@ -21,6 +39,8 @@ ADAPTER_REGISTRY = {
 
 @dataclass
 class TrainingState:
+    """Mutable runtime state for one training client or benchmark case."""
+
     model: torch.nn.Module
     device: torch.device
     adapter_type: str
@@ -102,11 +122,9 @@ def _replace_linear_layers(
 
 
 def build_dataloader(config_options: dict, tokenizer, shuffle: bool = True) -> DataLoader:
-    dataset = OrcaMath(
-        config_options.get("dataset", ""),
-        tokenizer,
-        max_length=config_options.get("max_length", 256),
-    )
+    # The data layer owns job-local datasets and batch collation. The runtime
+    # only needs a standard DataLoader that may already carry adapter routing.
+    dataset = build_training_dataset(config_options, tokenizer)
     generator = None
     if shuffle and config_options.get("seed") is not None:
         generator = torch.Generator()
@@ -117,7 +135,19 @@ def build_dataloader(config_options: dict, tokenizer, shuffle: bool = True) -> D
         batch_size=config_options["batch_size"],
         shuffle=shuffle,
         generator=generator,
+        collate_fn=grouped_batch_collator,
     )
+
+
+def validate_job_adapter_ids(config_options: dict, num_adapters: int) -> None:
+    # Jobs are allowed to choose adapter ids explicitly, but they must still fit
+    # inside the configured adapter bank for the current run.
+    job_specs = build_dataset_job_specs(config_options)
+    for job_spec in job_specs:
+        if job_spec.adapter_id < 0 or job_spec.adapter_id >= num_adapters:
+            raise ValueError(
+                f"Job adapter_id {job_spec.adapter_id} is out of range for num_adapters={num_adapters}."
+            )
 
 
 def build_optimizer(model: torch.nn.Module, config_options: dict):
@@ -150,7 +180,9 @@ def build_adapter_ids(batch: dict, num_adapters: int, device: torch.device) -> t
 
 
 def split_batch_for_adapters(batch: dict, num_adapters: int) -> list[dict]:
-    adapter_ids = build_adapter_ids(batch, num_adapters, next(iter(batch.values())).device)
+    adapter_ids = batch.get("adapter_ids")
+    if adapter_ids is None:
+        adapter_ids = build_adapter_ids(batch, num_adapters, next(iter(batch.values())).device)
     return [
         {key: value[adapter_ids == adapter_idx] for key, value in batch.items()}
         for adapter_idx in range(num_adapters)
@@ -202,7 +234,7 @@ def extract_batched_adapter_state(model: torch.nn.Module, adapter_index: int) ->
         name: {
             "A": module.A[adapter_index].detach().clone(),
             "B": module.B[adapter_index].detach().clone(),
-            "alpha": module.alpha[adapter_index].detach().clone(),
+            "alpha": module.alpha_tensor[adapter_index].detach().clone(),
         }
         for name, module in collect_batched_lora_modules(model).items()
     }
@@ -223,7 +255,7 @@ def extract_batched_lora_state(model: torch.nn.Module) -> dict[str, dict[str, to
         name: {
             "A": module.A.detach().clone(),
             "B": module.B.detach().clone(),
-            "alpha": module.alpha.detach().clone(),
+            "alpha": module.alpha_tensor.detach().clone(),
         }
         for name, module in collect_batched_lora_modules(model).items()
     }
@@ -303,10 +335,14 @@ def create_training_state(config_options: dict) -> TrainingState:
 
     adapter_type = normalize_adapter_type(config_options)
     num_adapters = get_num_adapters(config_options)
+    validate_job_adapter_ids(config_options, num_adapters)
     multi_adapter_baseline = adapter_type == "baseline_lora" and num_adapters > 1
 
     baseline_adapter_states = None
     if multi_adapter_baseline:
+        # Reference baseline mode keeps one model in memory, but stores private
+        # adapter/optimizer state per logical job so correctness can be compared
+        # against the batched path.
         baseline_adapter_states = build_matched_baseline_adapter_states(config_options, num_adapters)
         set_seed(seed)
 
@@ -333,7 +369,9 @@ def create_training_state(config_options: dict) -> TrainingState:
 
 def prepare_batch(state: TrainingState, batch: dict) -> dict:
     prepared_batch = move_batch_to_device(batch, state.device)
-    if not state.multi_adapter_baseline:
+    if not state.multi_adapter_baseline and "adapter_ids" not in prepared_batch:
+        # Older configs may not provide job routing metadata yet. In that case
+        # we fall back to deterministic round-robin assignment.
         prepared_batch["adapter_ids"] = build_adapter_ids(
             prepared_batch,
             state.num_adapters,
@@ -357,6 +395,8 @@ def forward_backward(state: TrainingState, batch: dict) -> dict:
     }
 
     if state.multi_adapter_baseline:
+        # The baseline reference path replays the same macro-batch as separate
+        # per-adapter steps, then applies their optimizer updates independently.
         state.pending_baseline_grads = [None] * state.num_adapters
         for adapter_idx, sub_batch in enumerate(split_batch_for_adapters(prepared_batch, state.num_adapters)):
             if batch_size(sub_batch) == 0:

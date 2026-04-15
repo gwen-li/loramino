@@ -4,12 +4,14 @@ from loramino.training.trainer import train
 
 
 def validate_config(config):
-    required_keys = ['base_model', 'dataset', 'batch_size', 'num_epochs', 'num_adaptors', 'learning_rate']
+    required_keys = ['base_model', 'batch_size', 'num_epochs', 'num_adaptors', 'learning_rate']
     for key in required_keys:
         if key not in config:
             raise ValueError(f'Missing required config option: {key}')
         if isinstance(config[key], (int | float)) and config[key] <= 0:
             raise ValueError(f'{key} must be greater than 0')
+    if 'dataset' not in config and 'dataset_jobs' not in config and 'jobs' not in config:
+        raise ValueError("Missing required config option: dataset, dataset_jobs, or jobs")
 
 
 def main():
@@ -32,4 +34,3 @@ def main():
         print('Final training configuration:')
         print(json.dumps(config_options, indent=2))
     train(config_options)
-
