@@ -13,3 +13,9 @@ pip install -r requirements.txt
 ```bash
 python main.py --config_file config.json --base_model pythia-14m --verbose
 ```
+
+### Run tiny test on local machine
+
+```bash
+python main.py --config_file config_tiny.json --base_model pythia-14m --verbose
+```
