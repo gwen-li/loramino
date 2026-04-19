@@ -17,7 +17,10 @@ def compute_memory_cost(rank: int, parameter_bytes: int = 4, layer_size: int = 4
     return 2 * rank * layer_size * parameter_bytes
 
 
-def compute_group_memory_cost(ranks: list[tuple[int, int]], start_rank: int, end_rank: int, parameter_bytes: int = 4, layer_sizes: list[int]) -> int:
+def compute_group_memory_cost(ranks: list[tuple[int, int]],
+                              start_rank: int,
+                              end_rank: int,
+                              parameter_bytes: int | list[int] = 4, layer_sizes: list[int]) -> int:
     """ Computes the total memory cost of a group of LoRA adaptors. This is done by summing
         the memory costs of each individual adaptor in the group, which are computed using
         the compute_memory_cost function.
@@ -35,15 +38,19 @@ def compute_group_memory_cost(ranks: list[tuple[int, int]], start_rank: int, end
     total_cost = 0
     for i in range(start_rank, end_rank):
         rank = ranks[i][1]
-        for layer_size in layer_sizes:
-            total_cost += compute_memory_cost(rank, parameter_bytes, layer_size)
+        for l, layer_size in enumerate(layer_sizes):
+            if isinstance(parameter_bytes, list):
+                param_bytes = parameter_bytes[l]
+            else:
+                param_bytes = parameter_bytes
+            total_cost += compute_memory_cost(rank, param_bytes, layer_size)
     return total_cost
 
 def compute_rank_groups(ranks: list[int],
                         min_group_size: int = 1,
                         max_group_size: int = 16,
                         max_rank_difference: int = 8,
-                        parameter_bytes: int = 4,
+                        parameter_bytes: int | list[int] = 4,
                         layer_sizes: list[int] | None = None,
                         max_memory_usage: int | None = None) -> list[list[int]]:
     """ Partitions a list of LoRA adaptor ranks into groups. Partitioning is
