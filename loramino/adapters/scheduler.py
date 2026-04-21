@@ -1,55 +1,6 @@
 from typing import Callable
 
 
-
-def compute_memory_cost(rank: int, parameter_bytes: int = 4, layer_size: int = 4096) -> int:
-    """ Computes the memory cost of a LoRA adaptor given its rank. This is a simple
-        model that assumes the memory cost is proportional to the number of parameters
-        in the adaptor, which is determined by the rank and the size of the layers
-        it is applied to.
-        
-        Args:
-            rank (int): The rank of the LoRA adaptor.
-            parameter_bytes (int): The number of bytes per parameter. Default is 4 (float32).
-            layer_size (int): The size of the layers the adaptor is applied to. Default is 4096.
-        
-        Returns:
-            int: The estimated memory cost in bytes.
-    """
-    return 2 * rank * layer_size * parameter_bytes
-
-
-def compute_group_memory_cost(ranks: list[tuple[int, int]],
-                              start_rank: int,
-                              end_rank: int,
-                              total_activation_bytes: int,
-                            ) -> int:
-    """ Computes the total memory cost of a group of LoRA adaptors. This is done by summing
-        the memory costs of each individual adaptor in the group, which are computed using
-        the compute_memory_cost function.
-        
-        Args:
-            ranks (list[int]): A list of ranks for the LoRA adaptors in the group.
-            start_rank (int): The rank of the first adaptor in the group.
-            end_rank (int): The rank of the last adaptor in the group.
-            layer_sizes (list[int]): A list of the sizes of the layers the adaptors are applied to.
-            total_activation_bytes (int): The total memory cost of the activations for the group.
-            weight_bytes (int): The number of bytes per parameter for the weights. Default is 4 (float32).
-            gradient_bytes (int): The number of bytes per parameter for the gradients. Default is 4 (float32).
-            optimizer_bytes (int): The number of bytes per parameter for the optimizer states. Default is 4 (float32).
-        Returns:
-            int: The total estimated memory cost in bytes for the group.
-    """
-    # With padding, all rows have size max_rank
-    max_rank = ranks[end_rank - 1][1]
-    num_adaptors = end_rank - start_rank
-    total_adaptor_size = max_rank * num_adaptors
-    total_layer_size = sum(layer_sizes)
-    weight_cost = total_adaptor_size * weight_bytes * total_layer_size
-    gradient_cost = total_adaptor_size * gradient_bytes * total_layer_size
-    optimizer_cost = 2 * total_adaptor_size * optimizer_bytes * total_layer_size
-    return weight_cost + gradient_cost + optimizer_cost + total_activation_bytes
-
 def build_default_memory_model(layer_sizes: list[int],
                               total_activation_bytes: int,
                               total_model_memory_bytes: int,
