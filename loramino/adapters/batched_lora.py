@@ -1,11 +1,8 @@
-"""Batched LoRA module for shared-backbone multi-adapter execution.
-
-Each linear layer keeps one bank of adapter weights, but the forward pass routes
-each example to its adapter id. Adapters with similar ranks are processed in
-groups so the batched path wastes less work on padding.
-"""
+"""Batched LoRA module for shared-backbone multi-adapter execution."""
 
 import torch
+
+from .lora_kernel import grouped_lora_forward
 from .scheduler import compute_rank_groups
 
 
@@ -16,10 +13,12 @@ class BatchedLoRA(torch.nn.Module):
                 rank: int | list[int] = 1,
                 alpha: float | torch.Tensor = 1.0,
                 rank_groups: list[list[int]] | None = None,
+                kernel_backend: str = "auto",
                 device: torch.device = torch.device('cpu')):
         super().__init__()
         self.linear_layer = linear_layer
         self.num_adapters = num_adapters
+        self.kernel_backend = kernel_backend
         
         if isinstance(rank, int):
             self.ranks = [rank] * num_adapters
@@ -34,11 +33,13 @@ class BatchedLoRA(torch.nn.Module):
         self.max_rank = max(self.ranks)
 
         self.rank_groups = list(map(list, rank_groups)) if rank_groups is not None else compute_rank_groups(self.ranks)
-        grouped_adapters = torch.empty(num_adapters, dtype=torch.long)
-        for i, group in enumerate(self.rank_groups):
+        execution_order = [adapter_id for group in self.rank_groups for adapter_id in group]
+        adapter_group_ids = torch.empty(num_adapters, dtype=torch.long)
+        for group_id, group in enumerate(self.rank_groups):
             for adapter_id in group:
-                grouped_adapters[adapter_id] = i
-        self.register_buffer("grouped_adapters_tensor", grouped_adapters)
+                adapter_group_ids[adapter_id] = group_id
+        self.register_buffer("adapter_execution_order", torch.tensor(execution_order, dtype=torch.long))
+        self.register_buffer("adapter_group_ids", adapter_group_ids)
 
         self.linear_layer.requires_grad_(False)
 
@@ -51,7 +52,7 @@ class BatchedLoRA(torch.nn.Module):
             )
         self.register_buffer("alpha_tensor", alpha_tensor)
 
-        rank_tensor = torch.as_tensor(self.ranks, dtype=linear_layer.weight.dtype, device=device)
+        rank_tensor = torch.as_tensor(self.ranks, dtype=torch.long, device=device)
         self.register_buffer("rank_tensor", rank_tensor)
 
         parameter_kwargs = {
@@ -81,42 +82,29 @@ class BatchedLoRA(torch.nn.Module):
         return adapter_ids
 
     def forward(self, x):
-        batch_size, seq_len, hidden_dim = x.shape
+        batch_size = x.shape[0]
+        hidden_dim = x.shape[-1]
+        tokens_per_example = x.numel() // (batch_size * hidden_dim)
         device = x.device
 
         adapter_ids = self._resolve_adapter_ids(batch_size, device)
-        token_adapter_ids = adapter_ids.repeat_interleave(seq_len)
+        token_adapter_ids = adapter_ids.repeat_interleave(tokens_per_example)
+        scales = self.alpha_tensor / self.rank_tensor.to(device=device, dtype=self.alpha_tensor.dtype)
 
-        flat_x = x.reshape(batch_size * seq_len, hidden_dim).to(dtype=self.A.dtype)
+        flat_x = x.reshape(batch_size * tokens_per_example, hidden_dim).to(dtype=self.A.dtype)
 
         base_output = self.linear_layer(x)
-
-        flat_output = torch.zeros(flat_x.shape[0], self.linear_layer.out_features, device=device, dtype=self.A.dtype)
-
-        group_ids = self.grouped_adapters_tensor.index_select(0, token_adapter_ids)
-
-        # Tokens are first routed by adapter id, then co-processed by rank group.
-        # That keeps per-adapter identity intact while still letting similar
-        # adapters share one batched matrix path.
-        for group_id in group_ids.unique():
-            indices = (group_ids == group_id).nonzero(as_tuple=True)[0]
-
-            group_adapter_ids = token_adapter_ids[indices]
-            group_rank = int(self.rank_tensor[group_adapter_ids].max().item())
-
-            # TODO (Gwen): A and B are still being duplicated :(
-            A = self.A.index_select(0, group_adapter_ids)[:, :group_rank, :]
-            B = self.B.index_select(0, group_adapter_ids)[:, :, :group_rank]
-
-            x_group = flat_x[indices]
-
-            Ax = torch.bmm(A, x_group.unsqueeze(-1)).squeeze(-1)
-            BAx = torch.bmm(B, Ax.unsqueeze(-1)).squeeze(-1)
-
-            scales = (self.alpha_tensor.index_select(0, group_adapter_ids) / self.rank_tensor.index_select(0, group_adapter_ids)).unsqueeze(-1)
-
-            flat_output[indices] = BAx * scales
-
-        lora_output = flat_output.reshape(batch_size, seq_len, -1).to(dtype=base_output.dtype)
+        flat_output = grouped_lora_forward(
+            flat_x,
+            token_adapter_ids,
+            self.A,
+            self.B,
+            scales,
+            self.rank_tensor,
+            adapter_order=self.adapter_execution_order,
+            adapter_group_ids=self.adapter_group_ids,
+            backend=self.kernel_backend,
+        )
+        lora_output = flat_output.reshape(*x.shape[:-1], self.linear_layer.out_features).to(dtype=base_output.dtype)
 
         return base_output + lora_output
