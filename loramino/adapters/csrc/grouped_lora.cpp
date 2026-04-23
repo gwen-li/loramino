@@ -15,6 +15,25 @@ struct GroupingState {
   std::vector<int64_t> token_counts_by_adapter;
 };
 
+void validate_bank_inputs(
+    const torch::Tensor& flat_x,
+    const torch::Tensor& A,
+    const torch::Tensor& B,
+    const torch::Tensor& scales,
+    const torch::Tensor& ranks) {
+  TORCH_CHECK(flat_x.is_cuda(), "flat_x must be a CUDA tensor.");
+  TORCH_CHECK(A.is_cuda() && B.is_cuda(), "A and B must be CUDA tensors.");
+  TORCH_CHECK(scales.is_cuda() && ranks.is_cuda(), "scales and ranks must be CUDA tensors.");
+  TORCH_CHECK(ranks.scalar_type() == torch::kLong, "ranks must use torch.long.");
+  TORCH_CHECK(flat_x.dim() == 2, "flat_x must have shape [tokens, hidden].");
+  TORCH_CHECK(A.dim() == 3 && B.dim() == 3, "A and B must be rank-3 tensors.");
+  TORCH_CHECK(A.size(0) == B.size(0), "A and B must agree on the number of adapters.");
+  TORCH_CHECK(A.size(1) == B.size(2), "A and B must agree on max rank.");
+  TORCH_CHECK(flat_x.size(1) == A.size(2), "flat_x hidden size must match A in_features.");
+  TORCH_CHECK(scales.dim() == 1 && scales.size(0) == A.size(0), "scales must be shape [num_adapters].");
+  TORCH_CHECK(ranks.dim() == 1 && ranks.size(0) == A.size(0), "ranks must be shape [num_adapters].");
+}
+
 // Validate the public extension contract before we touch any grouped logic.
 //
 // This extension assumes:
@@ -33,19 +52,47 @@ void validate_inputs(
     const torch::Tensor& B,
     const torch::Tensor& scales,
     const torch::Tensor& ranks) {
-  TORCH_CHECK(flat_x.is_cuda(), "flat_x must be a CUDA tensor.");
+  validate_bank_inputs(flat_x, A, B, scales, ranks);
   TORCH_CHECK(token_adapter_ids.is_cuda(), "token_adapter_ids must be a CUDA tensor.");
-  TORCH_CHECK(A.is_cuda() && B.is_cuda(), "A and B must be CUDA tensors.");
-  TORCH_CHECK(scales.is_cuda() && ranks.is_cuda(), "scales and ranks must be CUDA tensors.");
   TORCH_CHECK(token_adapter_ids.scalar_type() == torch::kLong, "token_adapter_ids must use torch.long.");
-  TORCH_CHECK(ranks.scalar_type() == torch::kLong, "ranks must use torch.long.");
-  TORCH_CHECK(flat_x.dim() == 2, "flat_x must have shape [tokens, hidden].");
-  TORCH_CHECK(A.dim() == 3 && B.dim() == 3, "A and B must be rank-3 tensors.");
-  TORCH_CHECK(A.size(0) == B.size(0), "A and B must agree on the number of adapters.");
-  TORCH_CHECK(A.size(1) == B.size(2), "A and B must agree on max rank.");
-  TORCH_CHECK(flat_x.size(1) == A.size(2), "flat_x hidden size must match A in_features.");
-  TORCH_CHECK(scales.dim() == 1 && scales.size(0) == A.size(0), "scales must be shape [num_adapters].");
-  TORCH_CHECK(ranks.dim() == 1 && ranks.size(0) == A.size(0), "ranks must be shape [num_adapters].");
+  TORCH_CHECK(token_adapter_ids.dim() == 1 && token_adapter_ids.size(0) == flat_x.size(0),
+              "token_adapter_ids must have shape [tokens].");
+}
+
+void validate_contiguous_segments(
+    const torch::Tensor& flat_x,
+    const torch::Tensor& segment_adapter_ids,
+    const torch::Tensor& segment_token_starts,
+    const torch::Tensor& segment_token_counts,
+    const torch::Tensor& A,
+    const torch::Tensor& B,
+    const torch::Tensor& scales,
+    const torch::Tensor& ranks) {
+  validate_bank_inputs(flat_x, A, B, scales, ranks);
+  TORCH_CHECK(segment_adapter_ids.is_cuda(), "segment_adapter_ids must be a CUDA tensor.");
+  TORCH_CHECK(segment_token_starts.is_cuda(), "segment_token_starts must be a CUDA tensor.");
+  TORCH_CHECK(segment_token_counts.is_cuda(), "segment_token_counts must be a CUDA tensor.");
+  TORCH_CHECK(segment_adapter_ids.scalar_type() == torch::kLong, "segment_adapter_ids must use torch.long.");
+  TORCH_CHECK(segment_token_starts.scalar_type() == torch::kLong, "segment_token_starts must use torch.long.");
+  TORCH_CHECK(segment_token_counts.scalar_type() == torch::kLong, "segment_token_counts must use torch.long.");
+  TORCH_CHECK(segment_adapter_ids.dim() == 1, "segment_adapter_ids must be one-dimensional.");
+  TORCH_CHECK(segment_token_starts.dim() == 1, "segment_token_starts must be one-dimensional.");
+  TORCH_CHECK(segment_token_counts.dim() == 1, "segment_token_counts must be one-dimensional.");
+  TORCH_CHECK(segment_adapter_ids.sizes() == segment_token_starts.sizes() &&
+                  segment_adapter_ids.sizes() == segment_token_counts.sizes(),
+              "Segment layout tensors must have matching shapes.");
+
+  int64_t cursor = 0;
+  for (int64_t segment_index = 0; segment_index < segment_adapter_ids.numel(); ++segment_index) {
+    const int64_t adapter_id = segment_adapter_ids[segment_index].item<int64_t>();
+    const int64_t token_start = segment_token_starts[segment_index].item<int64_t>();
+    const int64_t token_count = segment_token_counts[segment_index].item<int64_t>();
+    TORCH_CHECK(adapter_id >= 0 && adapter_id < A.size(0), "segment_adapter_ids must be in range [0, num_adapters).");
+    TORCH_CHECK(token_count >= 0, "segment_token_counts must be non-negative.");
+    TORCH_CHECK(token_start == cursor, "Segment layout must be packed without gaps or overlaps.");
+    cursor += token_count;
+  }
+  TORCH_CHECK(cursor == flat_x.size(0), "Segment layout must cover every token in flat_x.");
 }
 
 // Build the execution plan for one forward/backward call.
@@ -268,9 +315,107 @@ std::vector<torch::Tensor> grouped_lora_backward_cuda(
   return {grad_x, grad_A, grad_B};
 }
 
+torch::Tensor grouped_lora_forward_contiguous_cuda(
+    const torch::Tensor& flat_x,
+    const torch::Tensor& segment_adapter_ids,
+    const torch::Tensor& segment_token_starts,
+    const torch::Tensor& segment_token_counts,
+    const torch::Tensor& A,
+    const torch::Tensor& B,
+    const torch::Tensor& scales,
+    const torch::Tensor& ranks) {
+  validate_contiguous_segments(
+      flat_x,
+      segment_adapter_ids,
+      segment_token_starts,
+      segment_token_counts,
+      A,
+      B,
+      scales,
+      ranks);
+
+  auto output = torch::zeros({flat_x.size(0), B.size(1)}, flat_x.options());
+  for (int64_t segment_index = 0; segment_index < segment_adapter_ids.numel(); ++segment_index) {
+    const int64_t adapter_id = segment_adapter_ids[segment_index].item<int64_t>();
+    const int64_t token_start = segment_token_starts[segment_index].item<int64_t>();
+    const int64_t token_count = segment_token_counts[segment_index].item<int64_t>();
+    const int64_t rank = ranks[adapter_id].item<int64_t>();
+    if (token_count == 0 || rank == 0) {
+      continue;
+    }
+
+    auto x_segment = flat_x.narrow(0, token_start, token_count);
+    auto A_segment = A[adapter_id].narrow(0, 0, rank);
+    auto B_segment = B[adapter_id].narrow(1, 0, rank);
+    auto delta = torch::matmul(torch::matmul(x_segment, A_segment.transpose(0, 1)), B_segment.transpose(0, 1));
+    output.narrow(0, token_start, token_count).copy_(delta * scales[adapter_id]);
+  }
+
+  return output;
+}
+
+std::vector<torch::Tensor> grouped_lora_backward_contiguous_cuda(
+    const torch::Tensor& flat_x,
+    const torch::Tensor& segment_adapter_ids,
+    const torch::Tensor& segment_token_starts,
+    const torch::Tensor& segment_token_counts,
+    const torch::Tensor& A,
+    const torch::Tensor& B,
+    const torch::Tensor& scales,
+    const torch::Tensor& ranks,
+    const torch::Tensor& grad_output) {
+  validate_contiguous_segments(
+      flat_x,
+      segment_adapter_ids,
+      segment_token_starts,
+      segment_token_counts,
+      A,
+      B,
+      scales,
+      ranks);
+  TORCH_CHECK(grad_output.is_cuda(), "grad_output must be a CUDA tensor.");
+  TORCH_CHECK(
+      grad_output.dim() == 2 && grad_output.size(0) == flat_x.size(0) && grad_output.size(1) == B.size(1),
+      "grad_output must have shape [tokens, out_features].");
+
+  auto grad_x = torch::zeros_like(flat_x);
+  auto grad_A = torch::zeros_like(A);
+  auto grad_B = torch::zeros_like(B);
+  for (int64_t segment_index = 0; segment_index < segment_adapter_ids.numel(); ++segment_index) {
+    const int64_t adapter_id = segment_adapter_ids[segment_index].item<int64_t>();
+    const int64_t token_start = segment_token_starts[segment_index].item<int64_t>();
+    const int64_t token_count = segment_token_counts[segment_index].item<int64_t>();
+    const int64_t rank = ranks[adapter_id].item<int64_t>();
+    if (token_count == 0 || rank == 0) {
+      continue;
+    }
+
+    auto x_segment = flat_x.narrow(0, token_start, token_count);
+    auto grad_segment = grad_output.narrow(0, token_start, token_count) * scales[adapter_id];
+    auto A_segment = A[adapter_id].narrow(0, 0, rank);
+    auto B_segment = B[adapter_id].narrow(1, 0, rank);
+
+    auto down_projection = torch::matmul(x_segment, A_segment.transpose(0, 1));
+    auto grad_B_segment = torch::matmul(grad_segment.transpose(0, 1), down_projection);
+    auto grad_down_projection = torch::matmul(grad_segment, B_segment);
+    auto grad_A_segment = torch::matmul(grad_down_projection.transpose(0, 1), x_segment);
+    auto grad_x_segment = torch::matmul(grad_down_projection, A_segment);
+
+    grad_x.narrow(0, token_start, token_count).copy_(grad_x_segment);
+    grad_A[adapter_id].narrow(0, 0, rank).add_(grad_A_segment);
+    grad_B[adapter_id].narrow(1, 0, rank).add_(grad_B_segment);
+  }
+
+  return {grad_x, grad_A, grad_B};
+}
+
 }  // namespace
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("forward", &grouped_lora_forward_cuda, "Grouped LoRA forward (CUDA via ATen GEMM)");
   m.def("backward", &grouped_lora_backward_cuda, "Grouped LoRA backward (CUDA via ATen GEMM)");
+  m.def("forward_contiguous", &grouped_lora_forward_contiguous_cuda,
+        "Grouped LoRA forward for contiguous adapter segments (CUDA via ATen GEMM)");
+  m.def("backward_contiguous", &grouped_lora_backward_contiguous_cuda,
+        "Grouped LoRA backward for contiguous adapter segments (CUDA via ATen GEMM)");
 }

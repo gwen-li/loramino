@@ -15,7 +15,13 @@ class ScheduledJobGroup:
 
 
 class RankAwareScheduler:
-    """Group jobs with similar adapter ranks to reduce padded batched work."""
+    """
+    Group jobs with similar adapter ranks to reduce padded batched work.
+    Usage:
+        scheduler = RankAwareScheduler.from_config(config_options)
+        job_groups = scheduler.group_jobs(jobs)
+    Each job group can then be processed together in a batch.
+    """
 
     def __init__(
         self,
