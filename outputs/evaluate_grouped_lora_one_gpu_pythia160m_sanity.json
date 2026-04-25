@@ -1,0 +1,2115 @@
+{
+  "config_summary": {
+    "base_model": "pythia-160m",
+    "workloads": [
+      "mixed_tasks_6way",
+      "mixed_tasks_6way_rank_skew"
+    ],
+    "backends": [
+      "legacy",
+      "auto",
+      "cuda"
+    ],
+    "hardware": {
+      "gpu_count": 1,
+      "gpu_model": "Tesla V100-SXM2-32GB"
+    },
+    "world_size": 1,
+    "launched_processes": 1,
+    "max_length": 256,
+    "samples_per_job": 128,
+    "optimizer_lr": 2e-05,
+    "max_grad_norm": 1.0,
+    "benchmark_scope": "whole_dataset",
+    "benchmark_steps": 3,
+    "warmup_steps": 1,
+    "device": "cuda",
+    "include_kernel_microbench": true,
+    "include_train_step_benchmark": true,
+    "train_benchmark_steps": 1,
+    "train_benchmark_scope": "single_batch",
+    "include_baseline_lora": true,
+    "baseline_workloads": [
+      "mixed_tasks_6way",
+      "mixed_tasks_6way_rank_skew"
+    ],
+    "baseline_backends": [
+      "cuda"
+    ],
+    "baseline_benchmark_steps": 2,
+    "baseline_warmup_steps": 0,
+    "baseline_benchmark_scope": "whole_dataset",
+    "baseline_atol": 0.0001,
+    "reference_suites": [
+      "matched_multi_adapter_reference",
+      "multi_gpu_local_colocation",
+      "single_gpu_reference"
+    ],
+    "reference_batch_policy": "fixed_total_batch",
+    "use_tiny_datasets": false,
+    "seed": 0
+  },
+  "benchmark_design": {
+    "kernel_microbench": "Optional synthetic operator benchmark. Keep it separate from end-to-end workload results.",
+    "shared_backbone_runtime": "Grouped LoRA runtime under the currently launched topology. On torchrun this is the DDP-style path.",
+    "single_gpu_reference": "Single-GPU grouped-versus-serial baseline intended to mirror paper-style one-GPU PEFT comparisons.",
+    "multi_gpu_local_colocation": "Local-only multi-GPU packing benchmark: jobs are sharded across GPUs, and each GPU runs without DDP.",
+    "matched_multi_adapter_reference": "Same-workload correctness and performance reference against the project's baseline LoRA path when rank and alpha match."
+  },
+  "workloads": {
+    "mixed_tasks_6way": {
+      "workload": {
+        "description": "Six equal-rank adapters across diverse instruction-tuning task families in a throughput-oriented grouped regime.",
+        "jobs": [
+          {
+            "name": "math_reasoning",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 8,
+            "samples": 128
+          },
+          {
+            "name": "open_qa",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 8,
+            "samples": 128
+          },
+          {
+            "name": "closed_qa",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 128
+          },
+          {
+            "name": "classification",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 128
+          },
+          {
+            "name": "information_extraction",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 8,
+            "samples": 128
+          },
+          {
+            "name": "summarization",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 8,
+            "samples": 128
+          }
+        ],
+        "batch_size": 32,
+        "grouped_batching_strategy": "chunked",
+        "job_scheduler": {}
+      },
+      "scheduler_and_groupdata": {
+        "num_jobs": 6,
+        "num_job_groups": 1,
+        "world_size": 1,
+        "jobs": [
+          {
+            "name": "math_reasoning",
+            "adapter_id": 0,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 128
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa",
+            "adapter_id": 1,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 128
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa",
+            "adapter_id": 2,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 128
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification",
+            "adapter_id": 3,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 128
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction",
+            "adapter_id": 4,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 128
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization",
+            "adapter_id": 5,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 128
+            },
+            "rank": 8,
+            "alpha": 1.0
+          }
+        ],
+        "job_groups": [
+          {
+            "adapter_ids": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "ranks": [
+              8,
+              8,
+              8,
+              8,
+              8,
+              8
+            ],
+            "job_names": [
+              "math_reasoning",
+              "open_qa",
+              "closed_qa",
+              "classification",
+              "information_extraction",
+              "summarization"
+            ],
+            "rank_span": 0
+          }
+        ],
+        "dataset_examples": 768,
+        "num_batches": 24,
+        "total_examples_seen": 768,
+        "total_tokens_seen": 196608,
+        "adapter_example_counts": {
+          "0": 128,
+          "1": 128,
+          "2": 128,
+          "3": 128,
+          "4": 128,
+          "5": 128
+        },
+        "first_batch_adapter_ids": [
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            3,
+            3,
+            3,
+            3,
+            3,
+            4,
+            4,
+            4,
+            4,
+            4,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            3,
+            3,
+            3,
+            3,
+            3,
+            4,
+            4,
+            4,
+            4,
+            4,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            3,
+            3,
+            3,
+            3,
+            3,
+            4,
+            4,
+            4,
+            4,
+            4,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            3,
+            3,
+            3,
+            3,
+            3,
+            4,
+            4,
+            4,
+            4,
+            4,
+            5,
+            5,
+            5,
+            5,
+            5
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            3,
+            3,
+            3,
+            3,
+            3,
+            4,
+            4,
+            4,
+            4,
+            4,
+            5,
+            5,
+            5,
+            5,
+            5
+          ]
+        ]
+      },
+      "benchmark_suites": {
+        "shared_backbone_runtime": {
+          "selected": true,
+          "grouped_forward_backward": {
+            "config_summary": {
+              "base_model": "pythia-160m",
+              "world_size": 1,
+              "launched_processes": 1,
+              "distributed_mode": "ddp",
+              "effective_data_parallel_world_size": 1,
+              "num_adapters": 6,
+              "rank": [
+                8,
+                8,
+                8,
+                8,
+                8,
+                8
+              ],
+              "alpha": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "benchmark_steps": 3,
+              "warmup_steps": 1,
+              "benchmark_scope": "whole_dataset",
+              "execution_mode": "forward_backward",
+              "backends": [
+                "legacy",
+                "auto",
+                "cuda"
+              ],
+              "batch_size_per_rank": 32,
+              "global_batch_size": 32
+            },
+            "benchmark": {
+              "batched_legacy": {
+                "avg_pass_time_s": 10.455798340335605,
+                "pass_times_s": [
+                  10.323730345000513,
+                  10.518912840998382,
+                  10.524751835007919
+                ],
+                "examples_per_second": 73.45206697773297,
+                "tokens_per_second": 18803.72914629964,
+                "final_loss": 8.2111234664917,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.2111234664917,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 9153.60986328125
+              },
+              "batched_auto": {
+                "avg_pass_time_s": 9.461543521334534,
+                "pass_times_s": [
+                  9.4168527849979,
+                  9.572679182005231,
+                  9.39509859700047
+                ],
+                "examples_per_second": 81.17068829924644,
+                "tokens_per_second": 20779.696204607088,
+                "final_loss": 8.2111234664917,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.2111234664917,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 9147.48486328125
+              },
+              "batched_cuda": {
+                "avg_pass_time_s": 9.308307350666533,
+                "pass_times_s": [
+                  9.34386571199866,
+                  9.398106712003937,
+                  9.182949627997004
+                ],
+                "examples_per_second": 82.50694471804333,
+                "tokens_per_second": 21121.777847819092,
+                "final_loss": 8.2111234664917,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.2111234664917,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 9147.48486328125
+              }
+            },
+            "speedup": {
+              "batched_auto_vs_batched_legacy": 1.1050837864624474,
+              "batched_cuda_vs_batched_legacy": 1.123276009959738
+            }
+          },
+          "grouped_train_step": {
+            "config_summary": {
+              "base_model": "pythia-160m",
+              "world_size": 1,
+              "launched_processes": 1,
+              "distributed_mode": "ddp",
+              "effective_data_parallel_world_size": 1,
+              "num_adapters": 6,
+              "rank": [
+                8,
+                8,
+                8,
+                8,
+                8,
+                8
+              ],
+              "alpha": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "benchmark_steps": 1,
+              "warmup_steps": 0,
+              "benchmark_scope": "single_batch",
+              "execution_mode": "train_step",
+              "backends": [
+                "legacy",
+                "auto",
+                "cuda"
+              ],
+              "batch_size_per_rank": 32,
+              "global_batch_size": 32
+            },
+            "benchmark": {
+              "batched_legacy": {
+                "avg_pass_time_s": 0.4658926920092199,
+                "pass_times_s": [
+                  0.4658926920092199
+                ],
+                "examples_per_second": 68.68534439120742,
+                "tokens_per_second": 17583.4481641491,
+                "final_loss": 9.259119987487793,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 9.259119987487793,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 1,
+                "avg_peak_memory_mb": 8079.609375
+              },
+              "batched_auto": {
+                "avg_pass_time_s": 0.3392049800022505,
+                "pass_times_s": [
+                  0.3392049800022505
+                ],
+                "examples_per_second": 94.33823760425831,
+                "tokens_per_second": 24150.588826690127,
+                "final_loss": 9.259119987487793,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 9.259119987487793,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 1,
+                "avg_peak_memory_mb": 8073.484375
+              },
+              "batched_cuda": {
+                "avg_pass_time_s": 0.3386972830048762,
+                "pass_times_s": [
+                  0.3386972830048762
+                ],
+                "examples_per_second": 94.47964777308029,
+                "tokens_per_second": 24186.789829908554,
+                "final_loss": 9.259119987487793,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 9.259119987487793,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 1,
+                "avg_peak_memory_mb": 8073.484375
+              }
+            },
+            "speedup": {
+              "batched_auto_vs_batched_legacy": 1.3734842336516664,
+              "batched_cuda_vs_batched_legacy": 1.3755430450338524
+            }
+          },
+          "speedup_vs_local_colocation": {}
+        },
+        "single_gpu_reference": {
+          "selected": true,
+          "reference_batch_policy": "fixed_total_batch",
+          "grouped_forward_backward": {
+            "device_rank": 0,
+            "reference_batch_policy": "fixed_total_batch",
+            "local_job_count": 6,
+            "runtime": {
+              "config_summary": {
+                "base_model": "pythia-160m",
+                "world_size": 1,
+                "launched_processes": 1,
+                "distributed_mode": "local",
+                "effective_data_parallel_world_size": 1,
+                "num_adapters": 6,
+                "rank": [
+                  8,
+                  8,
+                  8,
+                  8,
+                  8,
+                  8
+                ],
+                "alpha": [
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0
+                ],
+                "benchmark_steps": 2,
+                "warmup_steps": 0,
+                "benchmark_scope": "whole_dataset",
+                "execution_mode": "forward_backward",
+                "backends": [
+                  "legacy",
+                  "auto",
+                  "cuda"
+                ],
+                "batch_size_per_rank": 32,
+                "global_batch_size": 32
+              },
+              "benchmark": {
+                "batched_legacy": {
+                  "avg_pass_time_s": 10.517679312506516,
+                  "pass_times_s": [
+                    10.37952782701177,
+                    10.655830798001261
+                  ],
+                  "examples_per_second": 73.01991030348067,
+                  "tokens_per_second": 18693.09703769105,
+                  "final_loss": 8.2111234664917,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 8.2111234664917,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 9153.60986328125
+                },
+                "batched_auto": {
+                  "avg_pass_time_s": 9.519364191502973,
+                  "pass_times_s": [
+                    9.59552585700294,
+                    9.443202526003006
+                  ],
+                  "examples_per_second": 80.6776570945274,
+                  "tokens_per_second": 20653.480216199016,
+                  "final_loss": 8.2111234664917,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 8.2111234664917,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 9147.48486328125
+                },
+                "batched_cuda": {
+                  "avg_pass_time_s": 9.532488653501787,
+                  "pass_times_s": [
+                    9.768002363009145,
+                    9.296974943994428
+                  ],
+                  "examples_per_second": 80.56657898227584,
+                  "tokens_per_second": 20625.044219462616,
+                  "final_loss": 8.2111234664917,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 8.2111234664917,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 9147.48486328125
+                }
+              },
+              "speedup": {
+                "batched_auto_vs_batched_legacy": 1.1048720377664134,
+                "batched_cuda_vs_batched_legacy": 1.1033508346891991
+              }
+            }
+          },
+          "serial_single_lora": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 1,
+            "job_assignment": "serial_single_gpu",
+            "batch_sizing_policy": "auto_backoff_on_oom",
+            "job_results": {
+              "math_reasoning": {
+                "avg_pass_time_s": 0.9769159009956638,
+                "pass_times_s": [
+                  0.9661418229952687,
+                  0.9876899789960589
+                ],
+                "examples_per_second": 131.02458448014158,
+                "tokens_per_second": 33542.293626916246,
+                "final_loss": 7.051506519317627,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 7.051506519317627,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 9138.39013671875,
+                "requested_batch_size": 32,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa": {
+                "avg_pass_time_s": 1.024434991501039,
+                "pass_times_s": [
+                  1.0515906130021904,
+                  0.9972793699998874
+                ],
+                "examples_per_second": 124.94692299845187,
+                "tokens_per_second": 31986.412287603678,
+                "final_loss": 13.81742000579834,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 13.81742000579834,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 9138.39013671875,
+                "requested_batch_size": 32,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa": {
+                "avg_pass_time_s": 1.070666577994416,
+                "pass_times_s": [
+                  1.08312248699076,
+                  1.058210668998072
+                ],
+                "examples_per_second": 119.55169109674738,
+                "tokens_per_second": 30605.23292076733,
+                "final_loss": 5.652198314666748,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 5.652198314666748,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 9138.39013671875,
+                "requested_batch_size": 32,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification": {
+                "avg_pass_time_s": 0.9833011690061539,
+                "pass_times_s": [
+                  0.9855389050062513,
+                  0.9810634330060566
+                ],
+                "examples_per_second": 130.17374944176328,
+                "tokens_per_second": 33324.4798570914,
+                "final_loss": 13.918272972106934,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 13.918272972106934,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 9138.39013671875,
+                "requested_batch_size": 32,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction": {
+                "avg_pass_time_s": 1.1257028489999357,
+                "pass_times_s": [
+                  1.1757427949924022,
+                  1.0756629030074691
+                ],
+                "examples_per_second": 113.70673896198633,
+                "tokens_per_second": 29108.9251742685,
+                "final_loss": 6.414806365966797,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 6.414806365966797,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 9138.39013671875,
+                "requested_batch_size": 32,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization": {
+                "avg_pass_time_s": 1.1313165565006784,
+                "pass_times_s": [
+                  1.1795418190013152,
+                  1.0830912940000417
+                ],
+                "examples_per_second": 113.14251459018865,
+                "tokens_per_second": 28964.483735088295,
+                "final_loss": 5.186061859130859,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 5.186061859130859,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 9138.39013671875,
+                "requested_batch_size": 32,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              }
+            },
+            "aggregate": {
+              "avg_pass_time_s": 6.312338044997887,
+              "pass_times_s": [
+                6.441678441988188,
+                6.182997648007586
+              ],
+              "examples_per_second": 121.66648784099729,
+              "tokens_per_second": 31146.620887295307,
+              "max_peak_memory_mb": 9138.39013671875
+            }
+          },
+          "speedup_vs_serial_single_lora": {
+            "batched_legacy_vs_serial_single_lora": 0.6001645284518153,
+            "batched_auto_vs_serial_single_lora": 0.6631050055456759,
+            "batched_cuda_vs_serial_single_lora": 0.66219203341816
+          },
+          "grouped_train_step": {
+            "device_rank": 0,
+            "reference_batch_policy": "fixed_total_batch",
+            "local_job_count": 6,
+            "runtime": {
+              "config_summary": {
+                "base_model": "pythia-160m",
+                "world_size": 1,
+                "launched_processes": 1,
+                "distributed_mode": "local",
+                "effective_data_parallel_world_size": 1,
+                "num_adapters": 6,
+                "rank": [
+                  8,
+                  8,
+                  8,
+                  8,
+                  8,
+                  8
+                ],
+                "alpha": [
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0
+                ],
+                "benchmark_steps": 1,
+                "warmup_steps": 0,
+                "benchmark_scope": "single_batch",
+                "execution_mode": "train_step",
+                "backends": [
+                  "legacy",
+                  "auto",
+                  "cuda"
+                ],
+                "batch_size_per_rank": 32,
+                "global_batch_size": 32
+              },
+              "benchmark": {
+                "batched_legacy": {
+                  "avg_pass_time_s": 0.38851472998794634,
+                  "pass_times_s": [
+                    0.38851472998794634
+                  ],
+                  "examples_per_second": 82.36495949842828,
+                  "tokens_per_second": 21085.42963159764,
+                  "final_loss": 9.259119987487793,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 9.259119987487793,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 1,
+                  "avg_peak_memory_mb": 8079.609375
+                },
+                "batched_auto": {
+                  "avg_pass_time_s": 0.3435278029937763,
+                  "pass_times_s": [
+                    0.3435278029937763
+                  ],
+                  "examples_per_second": 93.15112116436103,
+                  "tokens_per_second": 23846.687018076424,
+                  "final_loss": 9.259119987487793,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 9.259119987487793,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 1,
+                  "avg_peak_memory_mb": 8073.484375
+                },
+                "batched_cuda": {
+                  "avg_pass_time_s": 0.33676853800716344,
+                  "pass_times_s": [
+                    0.33676853800716344
+                  ],
+                  "examples_per_second": 95.02075279763612,
+                  "tokens_per_second": 24325.312716194847,
+                  "final_loss": 9.259119987487793,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 9.259119987487793,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 1,
+                  "avg_peak_memory_mb": 8073.484375
+                }
+              },
+              "speedup": {
+                "batched_auto_vs_batched_legacy": 1.1309557089764437,
+                "batched_cuda_vs_batched_legacy": 1.153655066138281
+              }
+            }
+          }
+        },
+        "multi_gpu_local_colocation": {
+          "selected": false,
+          "reason": "Requires more than one launched process.",
+          "reference_batch_policy": "fixed_total_batch"
+        },
+        "matched_multi_adapter_reference": {
+          "selected": true,
+          "supported": true,
+          "reason": null,
+          "comparisons": {
+            "batched_cuda": {
+              "config_summary": {
+                "base_model": "pythia-160m",
+                "world_size": 1,
+                "launched_processes": 1,
+                "distributed_mode": "ddp",
+                "effective_data_parallel_world_size": 1,
+                "num_adapters": 6,
+                "rank": [
+                  8,
+                  8,
+                  8,
+                  8,
+                  8,
+                  8
+                ],
+                "alpha": [
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0
+                ],
+                "kernel_backend": "cuda",
+                "batch_size_per_rank": 32,
+                "global_batch_size": 32,
+                "benchmark_steps": 2,
+                "warmup_steps": 0,
+                "benchmark_scope": "whole_dataset",
+                "correctness_scope": "single_batch",
+                "execution_mode": "forward_backward",
+                "cases": [
+                  "baseline_lora",
+                  "batched_lora"
+                ]
+              },
+              "correctness": {
+                "per_adapter": [
+                  {
+                    "max_a_diff": 0.0,
+                    "max_b_diff": 0.0,
+                    "max_alpha_diff": 0.0
+                  },
+                  {
+                    "max_a_diff": 0.0,
+                    "max_b_diff": 0.0,
+                    "max_alpha_diff": 0.0
+                  },
+                  {
+                    "max_a_diff": 0.0,
+                    "max_b_diff": 0.0,
+                    "max_alpha_diff": 0.0
+                  },
+                  {
+                    "max_a_diff": 0.0,
+                    "max_b_diff": 0.0,
+                    "max_alpha_diff": 0.0
+                  },
+                  {
+                    "max_a_diff": 0.0,
+                    "max_b_diff": 0.0,
+                    "max_alpha_diff": 0.0
+                  },
+                  {
+                    "max_a_diff": 0.0,
+                    "max_b_diff": 0.0,
+                    "max_alpha_diff": 0.0
+                  }
+                ],
+                "max_diff": {
+                  "max_a_diff": 0.0,
+                  "max_b_diff": 0.0,
+                  "max_alpha_diff": 0.0
+                },
+                "passed": true,
+                "atol": 0.0001
+              },
+              "benchmark": {
+                "baseline_lora": {
+                  "avg_pass_time_s": 8.300351770005364,
+                  "pass_times_s": [
+                    8.202217376005137,
+                    8.39848616400559
+                  ],
+                  "examples_per_second": 92.52619904318871,
+                  "tokens_per_second": 23686.70695505631,
+                  "final_loss": 5.556141376495361,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 5.556141376495361,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 3314.8955078125
+                },
+                "batched_lora": {
+                  "avg_pass_time_s": 9.62425778949546,
+                  "pass_times_s": [
+                    9.2187819499959,
+                    10.029733628995018
+                  ],
+                  "examples_per_second": 79.79836126565989,
+                  "tokens_per_second": 20428.380484008932,
+                  "final_loss": 8.2111234664917,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 8.2111234664917,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 9184.12353515625
+                },
+                "speedup": {
+                  "batched_lora_vs_baseline_lora": 0.8624407150715463
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "mixed_tasks_6way_rank_skew": {
+      "workload": {
+        "description": "Six diverse adapters with skewed ranks in a memory-aware grouped regime that caps co-scheduled group size.",
+        "jobs": [
+          {
+            "name": "math_reasoning",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 128
+          },
+          {
+            "name": "open_qa",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 8,
+            "samples": 128
+          },
+          {
+            "name": "closed_qa",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 128
+          },
+          {
+            "name": "classification",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 16,
+            "samples": 128
+          },
+          {
+            "name": "information_extraction",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 128
+          },
+          {
+            "name": "summarization",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 32,
+            "samples": 128
+          }
+        ],
+        "batch_size": 8,
+        "grouped_batching_strategy": "chunked",
+        "job_scheduler": {
+          "max_rank_difference": 8,
+          "max_group_size": 2
+        }
+      },
+      "scheduler_and_groupdata": {
+        "num_jobs": 6,
+        "num_job_groups": 4,
+        "world_size": 1,
+        "jobs": [
+          {
+            "name": "math_reasoning",
+            "adapter_id": 0,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 128
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa",
+            "adapter_id": 1,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 128
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa",
+            "adapter_id": 2,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 128
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification",
+            "adapter_id": 3,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 128
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction",
+            "adapter_id": 4,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 128
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization",
+            "adapter_id": 5,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 128
+            },
+            "rank": 32,
+            "alpha": 1.0
+          }
+        ],
+        "job_groups": [
+          {
+            "adapter_ids": [
+              0,
+              1
+            ],
+            "ranks": [
+              4,
+              8
+            ],
+            "job_names": [
+              "math_reasoning",
+              "open_qa"
+            ],
+            "rank_span": 4
+          },
+          {
+            "adapter_ids": [
+              2,
+              3
+            ],
+            "ranks": [
+              8,
+              16
+            ],
+            "job_names": [
+              "closed_qa",
+              "classification"
+            ],
+            "rank_span": 8
+          },
+          {
+            "adapter_ids": [
+              4
+            ],
+            "ranks": [
+              16
+            ],
+            "job_names": [
+              "information_extraction"
+            ],
+            "rank_span": 0
+          },
+          {
+            "adapter_ids": [
+              5
+            ],
+            "ranks": [
+              32
+            ],
+            "job_names": [
+              "summarization"
+            ],
+            "rank_span": 0
+          }
+        ],
+        "dataset_examples": 768,
+        "num_batches": 96,
+        "total_examples_seen": 768,
+        "total_tokens_seen": 196608,
+        "adapter_example_counts": {
+          "0": 128,
+          "1": 128,
+          "2": 128,
+          "3": 128,
+          "4": 128,
+          "5": 128
+        },
+        "first_batch_adapter_ids": [
+          [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1
+          ],
+          [
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1
+          ]
+        ]
+      },
+      "benchmark_suites": {
+        "shared_backbone_runtime": {
+          "selected": true,
+          "grouped_forward_backward": {
+            "config_summary": {
+              "base_model": "pythia-160m",
+              "world_size": 1,
+              "launched_processes": 1,
+              "distributed_mode": "ddp",
+              "effective_data_parallel_world_size": 1,
+              "num_adapters": 6,
+              "rank": [
+                4,
+                8,
+                8,
+                16,
+                16,
+                32
+              ],
+              "alpha": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "benchmark_steps": 3,
+              "warmup_steps": 1,
+              "benchmark_scope": "whole_dataset",
+              "execution_mode": "forward_backward",
+              "backends": [
+                "legacy",
+                "auto",
+                "cuda"
+              ],
+              "batch_size_per_rank": 8,
+              "global_batch_size": 8
+            },
+            "benchmark": {
+              "batched_legacy": {
+                "avg_pass_time_s": 11.406879055667863,
+                "pass_times_s": [
+                  11.362488960003247,
+                  11.384645002006437,
+                  11.473503204993904
+                ],
+                "examples_per_second": 67.32779371570486,
+                "tokens_per_second": 17235.915191220443,
+                "final_loss": 5.556141376495361,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 5.556141376495361,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 2606.40283203125
+              },
+              "batched_auto": {
+                "avg_pass_time_s": 13.119776108336131,
+                "pass_times_s": [
+                  13.342535642004805,
+                  12.93505321900011,
+                  13.081739464003476
+                ],
+                "examples_per_second": 58.53758430466074,
+                "tokens_per_second": 14985.62158199315,
+                "final_loss": 5.556141376495361,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 5.556141376495361,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 2600.27783203125
+              },
+              "batched_cuda": {
+                "avg_pass_time_s": 12.35119404666572,
+                "pass_times_s": [
+                  12.627063783002086,
+                  12.31679869099753,
+                  12.109719665997545
+                ],
+                "examples_per_second": 62.18022298883129,
+                "tokens_per_second": 15918.13708514081,
+                "final_loss": 5.556141376495361,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 5.556141376495361,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 2600.27783203125
+              }
+            },
+            "speedup": {
+              "batched_auto_vs_batched_legacy": 0.869441594237274,
+              "batched_cuda_vs_batched_legacy": 0.9235446396979909
+            }
+          },
+          "grouped_train_step": {
+            "config_summary": {
+              "base_model": "pythia-160m",
+              "world_size": 1,
+              "launched_processes": 1,
+              "distributed_mode": "ddp",
+              "effective_data_parallel_world_size": 1,
+              "num_adapters": 6,
+              "rank": [
+                4,
+                8,
+                8,
+                16,
+                16,
+                32
+              ],
+              "alpha": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "benchmark_steps": 1,
+              "warmup_steps": 0,
+              "benchmark_scope": "single_batch",
+              "execution_mode": "train_step",
+              "backends": [
+                "legacy",
+                "auto",
+                "cuda"
+              ],
+              "batch_size_per_rank": 8,
+              "global_batch_size": 8
+            },
+            "benchmark": {
+              "batched_legacy": {
+                "avg_pass_time_s": 0.13509870099369437,
+                "pass_times_s": [
+                  0.13509870099369437
+                ],
+                "examples_per_second": 59.21596537314888,
+                "tokens_per_second": 15159.287135526114,
+                "final_loss": 12.147222518920898,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 12.147222518920898,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 1,
+                "avg_peak_memory_mb": 2332.92578125
+              },
+              "batched_auto": {
+                "avg_pass_time_s": 0.152345296999556,
+                "pass_times_s": [
+                  0.152345296999556
+                ],
+                "examples_per_second": 52.51228726820044,
+                "tokens_per_second": 13443.145540659312,
+                "final_loss": 12.147222518920898,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 12.147222518920898,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 1,
+                "avg_peak_memory_mb": 2331.77734375
+              },
+              "batched_cuda": {
+                "avg_pass_time_s": 0.14253361900046002,
+                "pass_times_s": [
+                  0.14253361900046002
+                ],
+                "examples_per_second": 56.12710921185675,
+                "tokens_per_second": 14368.539958235328,
+                "final_loss": 12.147222518920898,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 12.147222518920898,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 1,
+                "avg_peak_memory_mb": 2331.77734375
+              }
+            },
+            "speedup": {
+              "batched_auto_vs_batched_legacy": 0.8867927245176993,
+              "batched_cuda_vs_batched_legacy": 0.947837443131633
+            }
+          },
+          "speedup_vs_local_colocation": {}
+        },
+        "single_gpu_reference": {
+          "selected": true,
+          "reference_batch_policy": "fixed_total_batch",
+          "grouped_forward_backward": {
+            "device_rank": 0,
+            "reference_batch_policy": "fixed_total_batch",
+            "local_job_count": 6,
+            "runtime": {
+              "config_summary": {
+                "base_model": "pythia-160m",
+                "world_size": 1,
+                "launched_processes": 1,
+                "distributed_mode": "local",
+                "effective_data_parallel_world_size": 1,
+                "num_adapters": 6,
+                "rank": [
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  32
+                ],
+                "alpha": [
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0
+                ],
+                "benchmark_steps": 2,
+                "warmup_steps": 0,
+                "benchmark_scope": "whole_dataset",
+                "execution_mode": "forward_backward",
+                "backends": [
+                  "legacy",
+                  "auto",
+                  "cuda"
+                ],
+                "batch_size_per_rank": 8,
+                "global_batch_size": 8
+              },
+              "benchmark": {
+                "batched_legacy": {
+                  "avg_pass_time_s": 11.449140458993497,
+                  "pass_times_s": [
+                    11.59846590399684,
+                    11.299815013990155
+                  ],
+                  "examples_per_second": 67.07927138728766,
+                  "tokens_per_second": 17172.29347514564,
+                  "final_loss": 5.556141376495361,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 5.556141376495361,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 2606.40283203125
+                },
+                "batched_auto": {
+                  "avg_pass_time_s": 12.864345177003997,
+                  "pass_times_s": [
+                    12.939032059002784,
+                    12.78965829500521
+                  ],
+                  "examples_per_second": 59.699890622715785,
+                  "tokens_per_second": 15283.17199941524,
+                  "final_loss": 5.556141376495361,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 5.556141376495361,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 2600.27783203125
+                },
+                "batched_cuda": {
+                  "avg_pass_time_s": 12.397395965490432,
+                  "pass_times_s": [
+                    12.619674634988769,
+                    12.175117295992095
+                  ],
+                  "examples_per_second": 61.9484932269499,
+                  "tokens_per_second": 15858.814266099174,
+                  "final_loss": 5.556141376495361,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 5.556141376495361,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 2600.27783203125
+                }
+              },
+              "speedup": {
+                "batched_auto_vs_batched_legacy": 0.8899901472995075,
+                "batched_cuda_vs_batched_legacy": 0.9235117189822353
+              }
+            }
+          },
+          "serial_single_lora": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 1,
+            "job_assignment": "serial_single_gpu",
+            "batch_sizing_policy": "auto_backoff_on_oom",
+            "job_results": {
+              "math_reasoning": {
+                "avg_pass_time_s": 1.1330287245000363,
+                "pass_times_s": [
+                  1.1582461729994975,
+                  1.1078112760005752
+                ],
+                "examples_per_second": 112.97154011384987,
+                "tokens_per_second": 28920.714269145567,
+                "final_loss": 8.569450378417969,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.569450378417969,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 2529.78173828125,
+                "requested_batch_size": 8,
+                "effective_batch_size": 8,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa": {
+                "avg_pass_time_s": 1.305556636500114,
+                "pass_times_s": [
+                  1.44524457200896,
+                  1.1658687009912683
+                ],
+                "examples_per_second": 98.04247201648599,
+                "tokens_per_second": 25098.872836220413,
+                "final_loss": 12.671734809875488,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 12.671734809875488,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 2532.06201171875,
+                "requested_batch_size": 8,
+                "effective_batch_size": 8,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa": {
+                "avg_pass_time_s": 1.2658060819958337,
+                "pass_times_s": [
+                  1.3200750639953185,
+                  1.2115370999963488
+                ],
+                "examples_per_second": 101.12133431858585,
+                "tokens_per_second": 25887.061585557978,
+                "final_loss": 5.717480659484863,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 5.717480659484863,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 2532.06201171875,
+                "requested_batch_size": 8,
+                "effective_batch_size": 8,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification": {
+                "avg_pass_time_s": 1.1947167820035247,
+                "pass_times_s": [
+                  1.2209954270074377,
+                  1.1684381369996117
+                ],
+                "examples_per_second": 107.1383627719246,
+                "tokens_per_second": 27427.4208696127,
+                "final_loss": 14.066739082336426,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 14.066739082336426,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 2536.62255859375,
+                "requested_batch_size": 8,
+                "effective_batch_size": 8,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction": {
+                "avg_pass_time_s": 1.2522287339961622,
+                "pass_times_s": [
+                  1.2607935069972882,
+                  1.2436639609950362
+                ],
+                "examples_per_second": 102.21774706568289,
+                "tokens_per_second": 26167.74324881482,
+                "final_loss": 7.5040998458862305,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 7.5040998458862305,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 2536.62255859375,
+                "requested_batch_size": 8,
+                "effective_batch_size": 8,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization": {
+                "avg_pass_time_s": 1.3068142869960866,
+                "pass_times_s": [
+                  1.3396383479994256,
+                  1.2739902259927476
+                ],
+                "examples_per_second": 97.94811801011731,
+                "tokens_per_second": 25074.718210590032,
+                "final_loss": 5.556141376495361,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 5.556141376495361,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "avg_peak_memory_mb": 2545.74365234375,
+                "requested_batch_size": 8,
+                "effective_batch_size": 8,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              }
+            },
+            "aggregate": {
+              "avg_pass_time_s": 7.458151245991758,
+              "pass_times_s": [
+                7.744993091007927,
+                7.171309400975588
+              ],
+              "examples_per_second": 102.97458105488904,
+              "tokens_per_second": 26361.492750051595,
+              "max_peak_memory_mb": 2545.74365234375
+            }
+          },
+          "speedup_vs_serial_single_lora": {
+            "batched_legacy_vs_serial_single_lora": 0.6514158222360921,
+            "batched_auto_vs_serial_single_lora": 0.5797536635851294,
+            "batched_cuda_vs_serial_single_lora": 0.6015901457654796
+          },
+          "grouped_train_step": {
+            "device_rank": 0,
+            "reference_batch_policy": "fixed_total_batch",
+            "local_job_count": 6,
+            "runtime": {
+              "config_summary": {
+                "base_model": "pythia-160m",
+                "world_size": 1,
+                "launched_processes": 1,
+                "distributed_mode": "local",
+                "effective_data_parallel_world_size": 1,
+                "num_adapters": 6,
+                "rank": [
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  32
+                ],
+                "alpha": [
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0
+                ],
+                "benchmark_steps": 1,
+                "warmup_steps": 0,
+                "benchmark_scope": "single_batch",
+                "execution_mode": "train_step",
+                "backends": [
+                  "legacy",
+                  "auto",
+                  "cuda"
+                ],
+                "batch_size_per_rank": 8,
+                "global_batch_size": 8
+              },
+              "benchmark": {
+                "batched_legacy": {
+                  "avg_pass_time_s": 0.13480043900199234,
+                  "pass_times_s": [
+                    0.13480043900199234
+                  ],
+                  "examples_per_second": 59.346987734081196,
+                  "tokens_per_second": 15192.828859924786,
+                  "final_loss": 12.147222518920898,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 12.147222518920898,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 1,
+                  "avg_peak_memory_mb": 2332.92578125
+                },
+                "batched_auto": {
+                  "avg_pass_time_s": 0.148575797007652,
+                  "pass_times_s": [
+                    0.148575797007652
+                  ],
+                  "examples_per_second": 53.84457065768243,
+                  "tokens_per_second": 13784.210088366703,
+                  "final_loss": 12.147222518920898,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 12.147222518920898,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 1,
+                  "avg_peak_memory_mb": 2331.77734375
+                },
+                "batched_cuda": {
+                  "avg_pass_time_s": 0.13966235500993207,
+                  "pass_times_s": [
+                    0.13966235500993207
+                  ],
+                  "examples_per_second": 57.28100460164144,
+                  "tokens_per_second": 14663.93717802021,
+                  "final_loss": 12.147222518920898,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 12.147222518920898,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 1,
+                  "avg_peak_memory_mb": 2331.77734375
+                }
+              },
+              "speedup": {
+                "batched_auto_vs_batched_legacy": 0.9072839703161735,
+                "batched_cuda_vs_batched_legacy": 0.9651880708470513
+              }
+            }
+          }
+        },
+        "multi_gpu_local_colocation": {
+          "selected": false,
+          "reason": "Requires more than one launched process.",
+          "reference_batch_policy": "fixed_total_batch"
+        },
+        "matched_multi_adapter_reference": {
+          "selected": true,
+          "supported": false,
+          "reason": "Matched multi-adapter baseline currently requires all jobs to share the same rank and alpha.",
+          "comparisons": {}
+        }
+      }
+    }
+  },
+  "kernel_microbench": {
+    "small": {
+      "config_summary": {
+        "mode": "forward_backward",
+        "backends": [
+          "legacy",
+          "auto",
+          "cuda"
+        ],
+        "num_adapters": 2,
+        "tokens_per_adapter": 64,
+        "total_tokens": 128,
+        "hidden_size": 512,
+        "out_features": 512,
+        "rank": 8,
+        "dtype": "float32",
+        "layout": "contiguous",
+        "benchmark_steps": 20,
+        "warmup_steps": 5,
+        "device": "cuda"
+      },
+      "benchmark": {
+        "legacy": {
+          "avg_pass_time_s": 0.0011724879987013992,
+          "pass_times_s": [
+            0.0011927169980481267,
+            0.0011692459956975654,
+            0.0011740399932023138,
+            0.001165566995041445,
+            0.0011587159970076755,
+            0.0011641399905784056,
+            0.00116431200876832,
+            0.0011867489956784993,
+            0.0011868979927385226,
+            0.0011759649933082983,
+            0.001196102995891124,
+            0.00118267499783542,
+            0.00118913700862322,
+            0.001154216006398201,
+            0.001162268003099598,
+            0.0011742829956347123,
+            0.0011822420055978,
+            0.0011565790046006441,
+            0.0011598209966905415,
+            0.0011540859995875508
+          ],
+          "tokens_per_second": 109169.56091812256
+        },
+        "auto": {
+          "avg_pass_time_s": 0.0015156651985307689,
+          "pass_times_s": [
+            0.001345362004940398,
+            0.0044369679962983355,
+            0.0014878390065860003,
+            0.001361967995762825,
+            0.0013698949915124103,
+            0.001350394988548942,
+            0.001347835990600288,
+            0.0013674640067620203,
+            0.0013671779888682067,
+            0.0013527089904528111,
+            0.001345071999821812,
+            0.001349825004581362,
+            0.0013932459987699986,
+            0.0013690180057892576,
+            0.0013463950017467141,
+            0.0013514029997168109,
+            0.0013443520001601428,
+            0.0013385179918259382,
+            0.0013504530070349574,
+            0.0013374080008361489
+          ],
+          "tokens_per_second": 84451.36836557214
+        },
+        "cuda": {
+          "avg_pass_time_s": 0.0010020251480455044,
+          "pass_times_s": [
+            0.0010235169902443886,
+            0.0010245540033793077,
+            0.0010175029892707244,
+            0.0010064170055557042,
+            0.0010007960081566125,
+            0.000996913993731141,
+            0.0009948369988705963,
+            0.0009944949997588992,
+            0.0010011959966504946,
+            0.001001379991066642,
+            0.0009999799949582666,
+            0.00099825399229303,
+            0.0009889329958241433,
+            0.0009993779967771843,
+            0.0009995370055548847,
+            0.0010006939992308617,
+            0.0009992019913624972,
+            0.0009979339956771582,
+            0.0009916300041368231,
+            0.0010033520084107295
+          ],
+          "tokens_per_second": 127741.3049459585
+        }
+      },
+      "speedup": {
+        "auto_vs_legacy": 0.7735798115823777,
+        "cuda_vs_legacy": 1.170118335840563
+      }
+    },
+    "medium": {
+      "config_summary": {
+        "mode": "forward_backward",
+        "backends": [
+          "legacy",
+          "auto",
+          "cuda"
+        ],
+        "num_adapters": 8,
+        "tokens_per_adapter": 128,
+        "total_tokens": 1024,
+        "hidden_size": 2048,
+        "out_features": 2048,
+        "rank": 16,
+        "dtype": "float16",
+        "layout": "contiguous",
+        "benchmark_steps": 20,
+        "warmup_steps": 5,
+        "device": "cuda"
+      },
+      "benchmark": {
+        "legacy": {
+          "avg_pass_time_s": 0.004189435100852279,
+          "pass_times_s": [
+            0.00421093100158032,
+            0.0041612479981267825,
+            0.004189350991509855,
+            0.0041489940049359575,
+            0.004146181003306992,
+            0.004152630994212814,
+            0.0042321489891037345,
+            0.004235788990627043,
+            0.004225751996273175,
+            0.004224347008857876,
+            0.004249753008480184,
+            0.004252508006175049,
+            0.004180902004009113,
+            0.0041525989945512265,
+            0.004157276009209454,
+            0.004225808006594889,
+            0.004185859012068249,
+            0.004147061001276597,
+            0.004161328004556708,
+            0.004148234991589561
+          ],
+          "tokens_per_second": 244424.36160227956
+        },
+        "auto": {
+          "avg_pass_time_s": 0.004344154852151405,
+          "pass_times_s": [
+            0.004336609010351822,
+            0.004343038002843969,
+            0.004338504004408605,
+            0.004328574999817647,
+            0.004374527008621953,
+            0.004352260002633557,
+            0.004333657008828595,
+            0.0043453690013848245,
+            0.0043336689996067435,
+            0.004339335995609872,
+            0.004349089998868294,
+            0.004346640009316616,
+            0.00433812900155317,
+            0.00434812500316184,
+            0.004345574998296797,
+            0.0043388319900259376,
+            0.00434147501073312,
+            0.004371508999611251,
+            0.004336988000432029,
+            0.004341189996921457
+          ],
+          "tokens_per_second": 235719.03738488347
+        },
+        "cuda": {
+          "avg_pass_time_s": 0.00233067725203,
+          "pass_times_s": [
+            0.0022978380002314225,
+            0.002304446999914944,
+            0.002296749997185543,
+            0.0023009020078461617,
+            0.00229901701095514,
+            0.0023524230055045336,
+            0.0024676539906067774,
+            0.0023358730104519054,
+            0.0025067750102607533,
+            0.002319402003195137,
+            0.002300081992871128,
+            0.002305674002855085,
+            0.0023028090072330087,
+            0.0023134429939091206,
+            0.0023143950093071908,
+            0.002312426993739791,
+            0.0023212189989862964,
+            0.0023307810042751953,
+            0.0023233249958138913,
+            0.0023083090054569766
+          ],
+          "tokens_per_second": 439357.27227272873
+        }
+      },
+      "speedup": {
+        "auto_vs_legacy": 0.9643843839446693,
+        "cuda_vs_legacy": 1.7975183381582829
+      }
+    },
+    "large": {
+      "config_summary": {
+        "mode": "forward_backward",
+        "backends": [
+          "legacy",
+          "auto",
+          "cuda"
+        ],
+        "num_adapters": 16,
+        "tokens_per_adapter": 256,
+        "total_tokens": 4096,
+        "hidden_size": 4096,
+        "out_features": 4096,
+        "rank": 32,
+        "dtype": "float16",
+        "layout": "contiguous",
+        "benchmark_steps": 20,
+        "warmup_steps": 5,
+        "device": "cuda"
+      },
+      "benchmark": {
+        "legacy": {
+          "avg_pass_time_s": 0.009641198399185669,
+          "pass_times_s": [
+            0.009667060992796905,
+            0.009606522988178767,
+            0.009603862999938428,
+            0.009613488000468351,
+            0.009617097995942459,
+            0.009598598000593483,
+            0.009602709003956988,
+            0.009611153000150807,
+            0.009628154002712108,
+            0.009626526007195935,
+            0.009605327999452129,
+            0.009591134992660955,
+            0.009598929987987503,
+            0.00958745100069791,
+            0.009608421009033918,
+            0.009604603998013772,
+            0.009604482009308413,
+            0.00960612999915611,
+            0.009602172998711467,
+            0.010240140996756963
+          ],
+          "tokens_per_second": 424843.4510325981
+        },
+        "auto": {
+          "avg_pass_time_s": 0.004473231701558689,
+          "pass_times_s": [
+            0.004470314001082443,
+            0.004479429000639357,
+            0.004475194989936426,
+            0.004470908010262065,
+            0.0044587149895960465,
+            0.004433988011442125,
+            0.004452302004210651,
+            0.004442274002940394,
+            0.004452242006664164,
+            0.00443726300727576,
+            0.0044933689932804555,
+            0.004476300993701443,
+            0.004473348002647981,
+            0.0045084830053383484,
+            0.0045531380019383505,
+            0.004506716999458149,
+            0.004501472998526879,
+            0.004454029010958038,
+            0.00446472100156825,
+            0.004460424999706447
+          ],
+          "tokens_per_second": 915669.0896589946
+        },
+        "cuda": {
+          "avg_pass_time_s": 0.004278833801072324,
+          "pass_times_s": [
+            0.004320977997849695,
+            0.004279972010408528,
+            0.004287570001906715,
+            0.004285877002985217,
+            0.004279284999938682,
+            0.004283310991013423,
+            0.004264718998456374,
+            0.0042759799980558455,
+            0.004262999995262362,
+            0.00428549200296402,
+            0.004303515001083724,
+            0.004264396004145965,
+            0.004263506009010598,
+            0.004282049005269073,
+            0.004271109006367624,
+            0.004262668997398578,
+            0.004258790999301709,
+            0.004314820995205082,
+            0.004270503006409854,
+            0.004259132998413406
+          ],
+          "tokens_per_second": 957270.1793122921
+        }
+      },
+      "speedup": {
+        "auto_vs_legacy": 2.155309414405297,
+        "cuda_vs_legacy": 2.253230400481897
+      }
+    }
+  }
+}
