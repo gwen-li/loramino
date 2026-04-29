@@ -1,0 +1,4427 @@
+{
+  "config_summary": {
+    "base_model": "pythia-2.8b",
+    "workloads": [
+      "mixed_tasks_16way_rank_skew",
+      "mixed_tasks_24way_rank_skew",
+      "mixed_tasks_32way_rank_skew"
+    ],
+    "backends": [
+      "cuda"
+    ],
+    "hardware": {
+      "gpu_count": 4,
+      "gpu_model": "Tesla V100-SXM2-32GB",
+      "gpu_memory_gb": 32
+    },
+    "world_size": 4,
+    "launched_processes": 4,
+    "max_length": 128,
+    "samples_per_job": 32,
+    "optimizer_lr": 2e-05,
+    "max_grad_norm": 1.0,
+    "benchmark_scope": "whole_dataset",
+    "benchmark_steps": 1,
+    "warmup_steps": 1,
+    "device": "cuda",
+    "include_kernel_microbench": false,
+    "include_train_step_benchmark": false,
+    "train_benchmark_steps": 1,
+    "train_benchmark_scope": "single_batch",
+    "include_baseline_lora": true,
+    "baseline_workloads": [
+      "mixed_tasks_16way_rank_skew",
+      "mixed_tasks_24way_rank_skew",
+      "mixed_tasks_32way_rank_skew"
+    ],
+    "baseline_backends": [
+      "cuda"
+    ],
+    "baseline_benchmark_steps": 1,
+    "baseline_warmup_steps": 0,
+    "baseline_benchmark_scope": "whole_dataset",
+    "baseline_atol": 0.0001,
+    "reference_suites": [
+      "project_paper_baseline"
+    ],
+    "reference_batch_policy": "scale_with_local_jobs",
+    "reference_batch_size_search": "none",
+    "reference_batch_size_search_max_multiplier": 64,
+    "use_tiny_datasets": false,
+    "seed": 0
+  },
+  "benchmark_design": {
+    "kernel_microbench": "Optional synthetic operator benchmark. Keep it separate from end-to-end workload results.",
+    "shared_backbone_runtime": "Grouped LoRA runtime under the currently launched topology. On torchrun this is the DDP-style path; use it for raw profiling, not as the headline paper-style speedup unless the topology and batch-sizing policy match the baseline suite.",
+    "project_paper_baseline": "Topology-aware headline baseline aligned with prior multi-LoRA systems work: serial single-LoRA on one GPU, and independent single-LoRA colocation on multi-GPU.",
+    "single_gpu_reference": "Single-GPU grouped-versus-serial baseline intended to mirror paper-style one-GPU PEFT comparisons.",
+    "multi_gpu_local_colocation": "Local-only multi-GPU packing benchmark: jobs are sharded across GPUs, and each GPU runs without DDP.",
+    "reference_batch_size_search": "Optional fair-eval mode: search for the largest fitting input batch per compared method under the same GPU memory budget.",
+    "headline_guidance": "For final speedups, use project_paper_baseline.speedup_vs_primary_baseline. shared_backbone_runtime is the raw launched topology and may not be directly comparable to the paper baseline suite.",
+    "cluster_efficiency": "Derived multi-job systems metrics for aggregate throughput, pass makespan, GPU-seconds, per-GPU throughput, per-job baseline completion time, and peak memory. This is the most direct block for the tLoRA/mLoRA-style cluster claim.",
+    "matched_multi_adapter_reference": "Same-workload correctness and performance reference against the project's baseline LoRA path when rank and alpha match."
+  },
+  "workloads": {
+    "mixed_tasks_16way_rank_skew": {
+      "workload": {
+        "description": "16 adapters with repeated mixed-task families and moderate rank skew, designed to stress scheduler quality under high local concurrency.",
+        "jobs": [
+          {
+            "name": "math_01",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_01",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_01",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_01",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_01",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_01",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_02",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_02",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_02",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_02",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_02",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_02",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_03",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_03",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_03",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_03",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          }
+        ],
+        "batch_size": 1,
+        "grouped_batching_strategy": "chunked",
+        "job_scheduler": {
+          "max_rank_difference": 8,
+          "max_group_size": 8
+        }
+      },
+      "scheduler_and_groupdata": {
+        "num_jobs": 16,
+        "num_job_groups": 2,
+        "world_size": 4,
+        "jobs": [
+          {
+            "name": "math_01",
+            "adapter_id": 0,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_01",
+            "adapter_id": 1,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_01",
+            "adapter_id": 2,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_01",
+            "adapter_id": 3,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_01",
+            "adapter_id": 4,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_01",
+            "adapter_id": 5,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_02",
+            "adapter_id": 6,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_02",
+            "adapter_id": 7,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_02",
+            "adapter_id": 8,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_02",
+            "adapter_id": 9,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_02",
+            "adapter_id": 10,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_02",
+            "adapter_id": 11,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_03",
+            "adapter_id": 12,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_03",
+            "adapter_id": 13,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_03",
+            "adapter_id": 14,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_03",
+            "adapter_id": 15,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          }
+        ],
+        "job_groups": [
+          {
+            "adapter_ids": [
+              0,
+              1,
+              6,
+              7,
+              12,
+              13,
+              2,
+              3
+            ],
+            "ranks": [
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              8,
+              8
+            ],
+            "job_names": [
+              "math_01",
+              "open_qa_01",
+              "math_02",
+              "open_qa_02",
+              "math_03",
+              "open_qa_03",
+              "closed_qa_01",
+              "classification_01"
+            ],
+            "rank_span": 4
+          },
+          {
+            "adapter_ids": [
+              8,
+              9,
+              14,
+              15,
+              4,
+              5,
+              10,
+              11
+            ],
+            "ranks": [
+              8,
+              8,
+              8,
+              8,
+              16,
+              16,
+              16,
+              16
+            ],
+            "job_names": [
+              "closed_qa_02",
+              "classification_02",
+              "closed_qa_03",
+              "classification_03",
+              "information_extraction_01",
+              "summarization_01",
+              "information_extraction_02",
+              "summarization_02"
+            ],
+            "rank_span": 8
+          }
+        ],
+        "dataset_examples": 512,
+        "num_batches": 128,
+        "total_examples_seen": 512,
+        "total_tokens_seen": 65536,
+        "adapter_example_counts": {
+          "0": 32,
+          "1": 32,
+          "2": 32,
+          "3": 32,
+          "4": 32,
+          "5": 32,
+          "6": 32,
+          "7": 32,
+          "8": 32,
+          "9": 32,
+          "10": 32,
+          "11": 32,
+          "12": 32,
+          "13": 32,
+          "14": 32,
+          "15": 32
+        },
+        "first_batch_adapter_ids": [
+          [
+            0
+          ],
+          [
+            12
+          ],
+          [
+            0
+          ],
+          [
+            12
+          ],
+          [
+            0
+          ]
+        ]
+      },
+      "benchmark_suites": {
+        "shared_backbone_runtime": {
+          "selected": true,
+          "headline_role": "raw_topology_profile",
+          "comparison_note": "Use this suite to profile the runtime exactly as launched. Do not use it as the headline speedup against paper-style baselines unless the topology and batch-sizing policy also match.",
+          "grouped_forward_backward": {
+            "config_summary": {
+              "base_model": "pythia-2.8b",
+              "world_size": 4,
+              "launched_processes": 4,
+              "distributed_mode": "ddp",
+              "effective_data_parallel_world_size": 4,
+              "num_adapters": 16,
+              "rank": [
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8
+              ],
+              "alpha": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "benchmark_steps": 1,
+              "warmup_steps": 1,
+              "benchmark_scope": "whole_dataset",
+              "execution_mode": "forward_backward",
+              "backends": [
+                "cuda"
+              ],
+              "batch_size_per_rank": 1,
+              "global_batch_size": 4
+            },
+            "benchmark": {
+              "batched_cuda": {
+                "avg_pass_time_s": 37.04849300195929,
+                "pass_times_s": [
+                  37.04849300195929
+                ],
+                "examples_per_second": 13.819725406183814,
+                "tokens_per_second": 1768.9248519915282,
+                "final_loss": 3.121835231781006,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.121835231781006,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  7463.53125
+                ],
+                "avg_peak_memory_mb": 7463.53125,
+                "max_peak_memory_mb": 7463.53125
+              }
+            },
+            "speedup": {}
+          }
+        },
+        "project_paper_baseline": {
+          "selected": true,
+          "topology": "multi_gpu_local_colocation",
+          "paper_analogue": "tLoRA/mLoRA-style multi-job baseline",
+          "recommended_claim": "aggregate throughput and job-turnaround under shared backbone execution",
+          "primary_baseline": "independent_single_lora",
+          "fairness_protocol": "cluster_style_preserve_per_job_batch",
+          "reference_batch_policy": "scale_with_local_jobs",
+          "reference_batch_size_search": "none",
+          "reference_batch_size_search_max_multiplier": 64,
+          "grouped_forward_backward": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 4,
+            "job_assignment": "round_robin_by_job_index",
+            "reference_batch_policy": "scale_with_local_jobs",
+            "reference_batch_size_search": "none",
+            "reference_batch_size_search_max_multiplier": 64,
+            "rank_shards": [
+              {
+                "rank": 0,
+                "job_names": [
+                  "math_01",
+                  "information_extraction_01",
+                  "closed_qa_02",
+                  "math_03"
+                ],
+                "num_jobs": 4
+              },
+              {
+                "rank": 1,
+                "job_names": [
+                  "open_qa_01",
+                  "summarization_01",
+                  "classification_02",
+                  "open_qa_03"
+                ],
+                "num_jobs": 4
+              },
+              {
+                "rank": 2,
+                "job_names": [
+                  "closed_qa_01",
+                  "math_02",
+                  "information_extraction_02",
+                  "closed_qa_03"
+                ],
+                "num_jobs": 4
+              },
+              {
+                "rank": 3,
+                "job_names": [
+                  "classification_01",
+                  "open_qa_02",
+                  "summarization_02",
+                  "classification_03"
+                ],
+                "num_jobs": 4
+              }
+            ],
+            "runtime": {
+              "config_summary": {
+                "base_model": "pythia-2.8b",
+                "world_size": 4,
+                "launched_processes": 4,
+                "distributed_mode": "local",
+                "effective_data_parallel_world_size": 1,
+                "num_adapters": 16,
+                "rank": [
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8
+                ],
+                "alpha": [
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0
+                ],
+                "benchmark_steps": 1,
+                "warmup_steps": 0,
+                "benchmark_scope": "whole_dataset",
+                "execution_mode": "forward_backward",
+                "backends": [
+                  "cuda"
+                ]
+              },
+              "benchmark": {
+                "batched_cuda": {
+                  "avg_pass_time_s": 10.932475368957967,
+                  "pass_times_s": [
+                    10.932475368957967
+                  ],
+                  "examples_per_second": 46.8329433838735,
+                  "tokens_per_second": 5994.616753135808,
+                  "final_loss": 5.248534798622131,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 5.248534798622131,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 7258.578125,
+                  "max_peak_memory_mb": 7258.578125,
+                  "gpu_slots": 4,
+                  "estimated_makespan_s": 10.932475368957967,
+                  "gpu_seconds_per_pass": 43.729901475831866,
+                  "tokens_per_second_per_gpu": 1498.654188283952,
+                  "examples_per_second_per_gpu": 11.708235845968375,
+                  "max_peak_memory_mb_per_gpu": 7258.578125,
+                  "avg_peak_memory_mb_per_gpu": 7258.578125
+                }
+              },
+              "speedup": {}
+            }
+          },
+          "independent_single_lora": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 4,
+            "job_assignment": "round_robin_by_job_index",
+            "batch_sizing_policy": "auto_backoff_on_oom",
+            "reference_batch_size_search": "none",
+            "reference_batch_size_search_max_multiplier": 64,
+            "job_results": {
+              "math_01": {
+                "avg_pass_time_s": 3.247812611050904,
+                "pass_times_s": [
+                  3.247812611050904
+                ],
+                "examples_per_second": 9.85278519182967,
+                "tokens_per_second": 1261.1565045541977,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_01": {
+                "avg_pass_time_s": 3.54428454907611,
+                "pass_times_s": [
+                  3.54428454907611
+                ],
+                "examples_per_second": 9.028620461170775,
+                "tokens_per_second": 1155.6634190298591,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_02": {
+                "avg_pass_time_s": 3.7984300350071862,
+                "pass_times_s": [
+                  3.7984300350071862
+                ],
+                "examples_per_second": 8.42453321637645,
+                "tokens_per_second": 1078.3402516961855,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "math_03": {
+                "avg_pass_time_s": 3.4729539109393954,
+                "pass_times_s": [
+                  3.4729539109393954
+                ],
+                "examples_per_second": 9.214058355109112,
+                "tokens_per_second": 1179.3994694539663,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_01": {
+                "avg_pass_time_s": 3.4118966970127076,
+                "pass_times_s": [
+                  3.4118966970127076
+                ],
+                "examples_per_second": 9.378947500965566,
+                "tokens_per_second": 1200.5052801235925,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_01": {
+                "avg_pass_time_s": 3.2607573120621964,
+                "pass_times_s": [
+                  3.2607573120621964
+                ],
+                "examples_per_second": 9.81367116210261,
+                "tokens_per_second": 1256.149908749134,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_02": {
+                "avg_pass_time_s": 3.294253621948883,
+                "pass_times_s": [
+                  3.294253621948883
+                ],
+                "examples_per_second": 9.713884743661229,
+                "tokens_per_second": 1243.3772471886373,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_03": {
+                "avg_pass_time_s": 3.2713659680448472,
+                "pass_times_s": [
+                  3.2713659680448472
+                ],
+                "examples_per_second": 9.781846578028995,
+                "tokens_per_second": 1252.0763619877114,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_01": {
+                "avg_pass_time_s": 3.0632869590772316,
+                "pass_times_s": [
+                  3.0632869590772316
+                ],
+                "examples_per_second": 10.446295246737025,
+                "tokens_per_second": 1337.1257915823392,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "math_02": {
+                "avg_pass_time_s": 3.259010090958327,
+                "pass_times_s": [
+                  3.259010090958327
+                ],
+                "examples_per_second": 9.818932469334653,
+                "tokens_per_second": 1256.8233560748356,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_02": {
+                "avg_pass_time_s": 3.0857861440163106,
+                "pass_times_s": [
+                  3.0857861440163106
+                ],
+                "examples_per_second": 10.370128876899532,
+                "tokens_per_second": 1327.37649624314,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_03": {
+                "avg_pass_time_s": 3.072783943032846,
+                "pass_times_s": [
+                  3.072783943032846
+                ],
+                "examples_per_second": 10.414009117873714,
+                "tokens_per_second": 1332.9931670878354,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_01": {
+                "avg_pass_time_s": 3.9588153819786385,
+                "pass_times_s": [
+                  3.9588153819786385
+                ],
+                "examples_per_second": 8.08322614529355,
+                "tokens_per_second": 1034.6529465975743,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_02": {
+                "avg_pass_time_s": 3.871516300016083,
+                "pass_times_s": [
+                  3.871516300016083
+                ],
+                "examples_per_second": 8.265495356397459,
+                "tokens_per_second": 1057.9834056188747,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_02": {
+                "avg_pass_time_s": 3.2854072999907658,
+                "pass_times_s": [
+                  3.2854072999907658
+                ],
+                "examples_per_second": 9.740040451024122,
+                "tokens_per_second": 1246.7251777310876,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_03": {
+                "avg_pass_time_s": 3.315077667008154,
+                "pass_times_s": [
+                  3.315077667008154
+                ],
+                "examples_per_second": 9.652865849408556,
+                "tokens_per_second": 1235.5668287242952,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              }
+            },
+            "aggregate": {
+              "avg_pass_time_s": 14.430816648993641,
+              "pass_times_s": [
+                14.430816648993641
+              ],
+              "examples_per_second": 35.4796275535595,
+              "tokens_per_second": 4541.392326855616,
+              "max_peak_memory_mb": 5809.298828125,
+              "num_jobs": 16,
+              "avg_job_completion_time_s": 3.3883399057012866,
+              "p50_job_completion_time_s": 3.2898304609698243,
+              "p95_job_completion_time_s": 3.8933410705067217,
+              "max_job_completion_time_s": 3.9588153819786385
+            }
+          },
+          "speedup_vs_primary_baseline": {
+            "batched_cuda_vs_independent_single_lora": 1.319995349815192
+          },
+          "cluster_efficiency": {
+            "baseline": "independent_single_lora",
+            "gpu_slots": 4,
+            "baseline_avg_pass_time_s": 14.430816648993641,
+            "baseline_tokens_per_second": 4541.392326855616,
+            "baseline_examples_per_second": 35.4796275535595,
+            "baseline_max_peak_memory_mb_per_gpu": 5809.298828125,
+            "baseline_avg_job_completion_time_s": 3.3883399057012866,
+            "baseline_p95_job_completion_time_s": 3.8933410705067217,
+            "cases": {
+              "batched_cuda": {
+                "grouped_avg_pass_time_s": 10.932475368957967,
+                "grouped_tokens_per_second": 5994.616753135808,
+                "grouped_examples_per_second": 46.8329433838735,
+                "grouped_max_peak_memory_mb_per_gpu": 7258.578125,
+                "speedup_vs_baseline_time": 1.319995349815192,
+                "tokens_per_second_ratio_vs_baseline": 1.319995349815192,
+                "examples_per_second_ratio_vs_baseline": 1.319995349815192,
+                "grouped_gpu_seconds_per_pass": 43.729901475831866,
+                "baseline_gpu_seconds_per_pass": 57.723266595974565,
+                "grouped_peak_memory_fraction": 0.22151422500610352,
+                "baseline_peak_memory_fraction": 0.17728573083877563
+              }
+            }
+          }
+        },
+        "single_gpu_reference": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the single-GPU reference suite."
+        },
+        "multi_gpu_local_colocation": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the local co-location suite."
+        },
+        "matched_multi_adapter_reference": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the matched multi-adapter reference suite."
+        }
+      }
+    },
+    "mixed_tasks_24way_rank_skew": {
+      "workload": {
+        "description": "24 adapters with repeated mixed-task families and moderate rank skew, designed to stress scheduler quality under high local concurrency.",
+        "jobs": [
+          {
+            "name": "math_01",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_01",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_01",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_01",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_01",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_01",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_02",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_02",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_02",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_02",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_02",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_02",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_03",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_03",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_03",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_03",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_03",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_03",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_04",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_04",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_04",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_04",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_04",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_04",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          }
+        ],
+        "batch_size": 1,
+        "grouped_batching_strategy": "chunked",
+        "job_scheduler": {
+          "max_rank_difference": 8,
+          "max_group_size": 8
+        }
+      },
+      "scheduler_and_groupdata": {
+        "num_jobs": 24,
+        "num_job_groups": 3,
+        "world_size": 4,
+        "jobs": [
+          {
+            "name": "math_01",
+            "adapter_id": 0,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_01",
+            "adapter_id": 1,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_01",
+            "adapter_id": 2,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_01",
+            "adapter_id": 3,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_01",
+            "adapter_id": 4,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_01",
+            "adapter_id": 5,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_02",
+            "adapter_id": 6,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_02",
+            "adapter_id": 7,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_02",
+            "adapter_id": 8,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_02",
+            "adapter_id": 9,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_02",
+            "adapter_id": 10,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_02",
+            "adapter_id": 11,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_03",
+            "adapter_id": 12,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_03",
+            "adapter_id": 13,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_03",
+            "adapter_id": 14,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_03",
+            "adapter_id": 15,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_03",
+            "adapter_id": 16,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_03",
+            "adapter_id": 17,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_04",
+            "adapter_id": 18,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_04",
+            "adapter_id": 19,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_04",
+            "adapter_id": 20,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_04",
+            "adapter_id": 21,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_04",
+            "adapter_id": 22,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_04",
+            "adapter_id": 23,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          }
+        ],
+        "job_groups": [
+          {
+            "adapter_ids": [
+              0,
+              1,
+              6,
+              7,
+              12,
+              13,
+              18,
+              19
+            ],
+            "ranks": [
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4
+            ],
+            "job_names": [
+              "math_01",
+              "open_qa_01",
+              "math_02",
+              "open_qa_02",
+              "math_03",
+              "open_qa_03",
+              "math_04",
+              "open_qa_04"
+            ],
+            "rank_span": 0
+          },
+          {
+            "adapter_ids": [
+              2,
+              3,
+              8,
+              9,
+              14,
+              15,
+              20,
+              21
+            ],
+            "ranks": [
+              8,
+              8,
+              8,
+              8,
+              8,
+              8,
+              8,
+              8
+            ],
+            "job_names": [
+              "closed_qa_01",
+              "classification_01",
+              "closed_qa_02",
+              "classification_02",
+              "closed_qa_03",
+              "classification_03",
+              "closed_qa_04",
+              "classification_04"
+            ],
+            "rank_span": 0
+          },
+          {
+            "adapter_ids": [
+              4,
+              5,
+              10,
+              11,
+              16,
+              17,
+              22,
+              23
+            ],
+            "ranks": [
+              16,
+              16,
+              16,
+              16,
+              16,
+              16,
+              16,
+              16
+            ],
+            "job_names": [
+              "information_extraction_01",
+              "summarization_01",
+              "information_extraction_02",
+              "summarization_02",
+              "information_extraction_03",
+              "summarization_03",
+              "information_extraction_04",
+              "summarization_04"
+            ],
+            "rank_span": 0
+          }
+        ],
+        "dataset_examples": 768,
+        "num_batches": 192,
+        "total_examples_seen": 768,
+        "total_tokens_seen": 98304,
+        "adapter_example_counts": {
+          "0": 32,
+          "1": 32,
+          "2": 32,
+          "3": 32,
+          "4": 32,
+          "5": 32,
+          "6": 32,
+          "7": 32,
+          "8": 32,
+          "9": 32,
+          "10": 32,
+          "11": 32,
+          "12": 32,
+          "13": 32,
+          "14": 32,
+          "15": 32,
+          "16": 32,
+          "17": 32,
+          "18": 32,
+          "19": 32,
+          "20": 32,
+          "21": 32,
+          "22": 32,
+          "23": 32
+        },
+        "first_batch_adapter_ids": [
+          [
+            0
+          ],
+          [
+            12
+          ],
+          [
+            0
+          ],
+          [
+            12
+          ],
+          [
+            0
+          ]
+        ]
+      },
+      "benchmark_suites": {
+        "shared_backbone_runtime": {
+          "selected": true,
+          "headline_role": "raw_topology_profile",
+          "comparison_note": "Use this suite to profile the runtime exactly as launched. Do not use it as the headline speedup against paper-style baselines unless the topology and batch-sizing policy also match.",
+          "grouped_forward_backward": {
+            "config_summary": {
+              "base_model": "pythia-2.8b",
+              "world_size": 4,
+              "launched_processes": 4,
+              "distributed_mode": "ddp",
+              "effective_data_parallel_world_size": 4,
+              "num_adapters": 24,
+              "rank": [
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8,
+                16,
+                16
+              ],
+              "alpha": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "benchmark_steps": 1,
+              "warmup_steps": 1,
+              "benchmark_scope": "whole_dataset",
+              "execution_mode": "forward_backward",
+              "backends": [
+                "cuda"
+              ],
+              "batch_size_per_rank": 1,
+              "global_batch_size": 4
+            },
+            "benchmark": {
+              "batched_cuda": {
+                "avg_pass_time_s": 52.09165135596413,
+                "pass_times_s": [
+                  52.09165135596413
+                ],
+                "examples_per_second": 14.743245414738984,
+                "tokens_per_second": 1887.13541308659,
+                "final_loss": 3.121835231781006,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.121835231781006,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  8470.0625
+                ],
+                "avg_peak_memory_mb": 8470.0625,
+                "max_peak_memory_mb": 8470.0625
+              }
+            },
+            "speedup": {}
+          }
+        },
+        "project_paper_baseline": {
+          "selected": true,
+          "topology": "multi_gpu_local_colocation",
+          "paper_analogue": "tLoRA/mLoRA-style multi-job baseline",
+          "recommended_claim": "aggregate throughput and job-turnaround under shared backbone execution",
+          "primary_baseline": "independent_single_lora",
+          "fairness_protocol": "cluster_style_preserve_per_job_batch",
+          "reference_batch_policy": "scale_with_local_jobs",
+          "reference_batch_size_search": "none",
+          "reference_batch_size_search_max_multiplier": 64,
+          "grouped_forward_backward": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 4,
+            "job_assignment": "round_robin_by_job_index",
+            "reference_batch_policy": "scale_with_local_jobs",
+            "reference_batch_size_search": "none",
+            "reference_batch_size_search_max_multiplier": 64,
+            "rank_shards": [
+              {
+                "rank": 0,
+                "job_names": [
+                  "math_01",
+                  "information_extraction_01",
+                  "closed_qa_02",
+                  "math_03",
+                  "information_extraction_03",
+                  "closed_qa_04"
+                ],
+                "num_jobs": 6
+              },
+              {
+                "rank": 1,
+                "job_names": [
+                  "open_qa_01",
+                  "summarization_01",
+                  "classification_02",
+                  "open_qa_03",
+                  "summarization_03",
+                  "classification_04"
+                ],
+                "num_jobs": 6
+              },
+              {
+                "rank": 2,
+                "job_names": [
+                  "closed_qa_01",
+                  "math_02",
+                  "information_extraction_02",
+                  "closed_qa_03",
+                  "math_04",
+                  "information_extraction_04"
+                ],
+                "num_jobs": 6
+              },
+              {
+                "rank": 3,
+                "job_names": [
+                  "classification_01",
+                  "open_qa_02",
+                  "summarization_02",
+                  "classification_03",
+                  "open_qa_04",
+                  "summarization_04"
+                ],
+                "num_jobs": 6
+              }
+            ],
+            "runtime": {
+              "config_summary": {
+                "base_model": "pythia-2.8b",
+                "world_size": 4,
+                "launched_processes": 4,
+                "distributed_mode": "local",
+                "effective_data_parallel_world_size": 1,
+                "num_adapters": 24,
+                "rank": [
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16
+                ],
+                "alpha": [
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0
+                ],
+                "benchmark_steps": 1,
+                "warmup_steps": 0,
+                "benchmark_scope": "whole_dataset",
+                "execution_mode": "forward_backward",
+                "backends": [
+                  "cuda"
+                ]
+              },
+              "benchmark": {
+                "batched_cuda": {
+                  "avg_pass_time_s": 14.093512709951028,
+                  "pass_times_s": [
+                    14.093512709951028
+                  ],
+                  "examples_per_second": 54.49315694431077,
+                  "tokens_per_second": 6975.124088871778,
+                  "final_loss": 4.5413888692855835,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 4.5413888692855835,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 8357.548828125,
+                  "max_peak_memory_mb": 8357.548828125,
+                  "gpu_slots": 4,
+                  "estimated_makespan_s": 14.093512709951028,
+                  "gpu_seconds_per_pass": 56.37405083980411,
+                  "tokens_per_second_per_gpu": 1743.7810222179446,
+                  "examples_per_second_per_gpu": 13.623289236077692,
+                  "max_peak_memory_mb_per_gpu": 8357.548828125,
+                  "avg_peak_memory_mb_per_gpu": 8357.548828125
+                }
+              },
+              "speedup": {}
+            }
+          },
+          "independent_single_lora": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 4,
+            "job_assignment": "round_robin_by_job_index",
+            "batch_sizing_policy": "auto_backoff_on_oom",
+            "reference_batch_size_search": "none",
+            "reference_batch_size_search_max_multiplier": 64,
+            "job_results": {
+              "math_01": {
+                "avg_pass_time_s": 3.4176620229845867,
+                "pass_times_s": [
+                  3.4176620229845867
+                ],
+                "examples_per_second": 9.36312595709945,
+                "tokens_per_second": 1198.4801225087297,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_01": {
+                "avg_pass_time_s": 3.181448003044352,
+                "pass_times_s": [
+                  3.181448003044352
+                ],
+                "examples_per_second": 10.058313060398584,
+                "tokens_per_second": 1287.4640717310187,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_02": {
+                "avg_pass_time_s": 3.558425531955436,
+                "pass_times_s": [
+                  3.558425531955436
+                ],
+                "examples_per_second": 8.99274123137692,
+                "tokens_per_second": 1151.0708776162458,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "math_03": {
+                "avg_pass_time_s": 3.5016672239871696,
+                "pass_times_s": [
+                  3.5016672239871696
+                ],
+                "examples_per_second": 9.13850401911214,
+                "tokens_per_second": 1169.728514446354,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_03": {
+                "avg_pass_time_s": 3.5702097240136936,
+                "pass_times_s": [
+                  3.5702097240136936
+                ],
+                "examples_per_second": 8.96305888832352,
+                "tokens_per_second": 1147.2715377054105,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_04": {
+                "avg_pass_time_s": 3.5582697950303555,
+                "pass_times_s": [
+                  3.5582697950303555
+                ],
+                "examples_per_second": 8.993134822067928,
+                "tokens_per_second": 1151.1212572246948,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_01": {
+                "avg_pass_time_s": 3.7732757289195433,
+                "pass_times_s": [
+                  3.7732757289195433
+                ],
+                "examples_per_second": 8.48069483890143,
+                "tokens_per_second": 1085.528939379383,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_01": {
+                "avg_pass_time_s": 4.0103116950485855,
+                "pass_times_s": [
+                  4.0103116950485855
+                ],
+                "examples_per_second": 7.979429638725954,
+                "tokens_per_second": 1021.366993756922,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_02": {
+                "avg_pass_time_s": 3.2753734450088814,
+                "pass_times_s": [
+                  3.2753734450088814
+                ],
+                "examples_per_second": 9.769878316856547,
+                "tokens_per_second": 1250.544424557638,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_03": {
+                "avg_pass_time_s": 3.448487601010129,
+                "pass_times_s": [
+                  3.448487601010129
+                ],
+                "examples_per_second": 9.279430203149515,
+                "tokens_per_second": 1187.7670660031379,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_03": {
+                "avg_pass_time_s": 3.430910379975103,
+                "pass_times_s": [
+                  3.430910379975103
+                ],
+                "examples_per_second": 9.326970528513838,
+                "tokens_per_second": 1193.8522276497713,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_04": {
+                "avg_pass_time_s": 3.4598298330092803,
+                "pass_times_s": [
+                  3.4598298330092803
+                ],
+                "examples_per_second": 9.249009790798624,
+                "tokens_per_second": 1183.8732532222239,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_01": {
+                "avg_pass_time_s": 3.066580348997377,
+                "pass_times_s": [
+                  3.066580348997377
+                ],
+                "examples_per_second": 10.435076325478459,
+                "tokens_per_second": 1335.6897696612427,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "math_02": {
+                "avg_pass_time_s": 3.02988632209599,
+                "pass_times_s": [
+                  3.02988632209599
+                ],
+                "examples_per_second": 10.561452344477168,
+                "tokens_per_second": 1351.8659000930775,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_02": {
+                "avg_pass_time_s": 3.03648474405054,
+                "pass_times_s": [
+                  3.03648474405054
+                ],
+                "examples_per_second": 10.53850181948004,
+                "tokens_per_second": 1348.928232893445,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_03": {
+                "avg_pass_time_s": 3.025235211942345,
+                "pass_times_s": [
+                  3.025235211942345
+                ],
+                "examples_per_second": 10.577689917688906,
+                "tokens_per_second": 1353.94430946418,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "math_04": {
+                "avg_pass_time_s": 3.118033336941153,
+                "pass_times_s": [
+                  3.118033336941153
+                ],
+                "examples_per_second": 10.262879367220807,
+                "tokens_per_second": 1313.6485590042632,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_04": {
+                "avg_pass_time_s": 3.056308027007617,
+                "pass_times_s": [
+                  3.056308027007617
+                ],
+                "examples_per_second": 10.470148858435154,
+                "tokens_per_second": 1340.1790538796997,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_01": {
+                "avg_pass_time_s": 3.3303582000080496,
+                "pass_times_s": [
+                  3.3303582000080496
+                ],
+                "examples_per_second": 9.60857603843414,
+                "tokens_per_second": 1229.89773291957,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_02": {
+                "avg_pass_time_s": 3.3028164950665087,
+                "pass_times_s": [
+                  3.3028164950665087
+                ],
+                "examples_per_second": 9.688700552331357,
+                "tokens_per_second": 1240.1536706984136,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_02": {
+                "avg_pass_time_s": 3.2129509159130976,
+                "pass_times_s": [
+                  3.2129509159130976
+                ],
+                "examples_per_second": 9.95969152267794,
+                "tokens_per_second": 1274.8405149027762,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_03": {
+                "avg_pass_time_s": 3.215362232993357,
+                "pass_times_s": [
+                  3.215362232993357
+                ],
+                "examples_per_second": 9.95222238777416,
+                "tokens_per_second": 1273.8844656350925,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_04": {
+                "avg_pass_time_s": 3.2105363130103797,
+                "pass_times_s": [
+                  3.2105363130103797
+                ],
+                "examples_per_second": 9.967182078060658,
+                "tokens_per_second": 1275.7993059917642,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_04": {
+                "avg_pass_time_s": 3.1936758970841765,
+                "pass_times_s": [
+                  3.1936758970841765
+                ],
+                "examples_per_second": 10.019801955864079,
+                "tokens_per_second": 1282.534650350602,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              }
+            },
+            "aggregate": {
+              "avg_pass_time_s": 21.398188682971522,
+              "pass_times_s": [
+                21.398188682971522
+              ],
+              "examples_per_second": 35.89088830734384,
+              "tokens_per_second": 4594.033703340012,
+              "max_peak_memory_mb": 5809.298828125,
+              "num_jobs": 24,
+              "avg_job_completion_time_s": 3.332670792879071,
+              "p50_job_completion_time_s": 3.289094970037695,
+              "p95_job_completion_time_s": 3.742815828183665,
+              "max_job_completion_time_s": 4.0103116950485855
+            }
+          },
+          "speedup_vs_primary_baseline": {
+            "batched_cuda_vs_independent_single_lora": 1.5183005914389867
+          },
+          "cluster_efficiency": {
+            "baseline": "independent_single_lora",
+            "gpu_slots": 4,
+            "baseline_avg_pass_time_s": 21.398188682971522,
+            "baseline_tokens_per_second": 4594.033703340012,
+            "baseline_examples_per_second": 35.89088830734384,
+            "baseline_max_peak_memory_mb_per_gpu": 5809.298828125,
+            "baseline_avg_job_completion_time_s": 3.332670792879071,
+            "baseline_p95_job_completion_time_s": 3.742815828183665,
+            "cases": {
+              "batched_cuda": {
+                "grouped_avg_pass_time_s": 14.093512709951028,
+                "grouped_tokens_per_second": 6975.124088871778,
+                "grouped_examples_per_second": 54.49315694431077,
+                "grouped_max_peak_memory_mb_per_gpu": 8357.548828125,
+                "speedup_vs_baseline_time": 1.5183005914389867,
+                "tokens_per_second_ratio_vs_baseline": 1.5183005914389867,
+                "examples_per_second_ratio_vs_baseline": 1.5183005914389867,
+                "grouped_gpu_seconds_per_pass": 56.37405083980411,
+                "baseline_gpu_seconds_per_pass": 85.59275473188609,
+                "grouped_peak_memory_fraction": 0.2550521492958069,
+                "baseline_peak_memory_fraction": 0.17728573083877563
+              }
+            }
+          }
+        },
+        "single_gpu_reference": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the single-GPU reference suite."
+        },
+        "multi_gpu_local_colocation": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the local co-location suite."
+        },
+        "matched_multi_adapter_reference": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the matched multi-adapter reference suite."
+        }
+      }
+    },
+    "mixed_tasks_32way_rank_skew": {
+      "workload": {
+        "description": "32 adapters with repeated mixed-task families and moderate rank skew, designed to stress scheduler quality under high local concurrency.",
+        "jobs": [
+          {
+            "name": "math_01",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_01",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_01",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_01",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_01",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_01",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_02",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_02",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_02",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_02",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_02",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_02",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_03",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_03",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_03",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_03",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_03",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_03",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_04",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_04",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_04",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_04",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_04",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_04",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_05",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_05",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_05",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_05",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_05",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_05",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_06",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_06",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          }
+        ],
+        "batch_size": 1,
+        "grouped_batching_strategy": "chunked",
+        "job_scheduler": {
+          "max_rank_difference": 8,
+          "max_group_size": 8
+        }
+      },
+      "scheduler_and_groupdata": {
+        "num_jobs": 32,
+        "num_job_groups": 4,
+        "world_size": 4,
+        "jobs": [
+          {
+            "name": "math_01",
+            "adapter_id": 0,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_01",
+            "adapter_id": 1,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_01",
+            "adapter_id": 2,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_01",
+            "adapter_id": 3,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_01",
+            "adapter_id": 4,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_01",
+            "adapter_id": 5,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_02",
+            "adapter_id": 6,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_02",
+            "adapter_id": 7,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_02",
+            "adapter_id": 8,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_02",
+            "adapter_id": 9,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_02",
+            "adapter_id": 10,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_02",
+            "adapter_id": 11,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_03",
+            "adapter_id": 12,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_03",
+            "adapter_id": 13,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_03",
+            "adapter_id": 14,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_03",
+            "adapter_id": 15,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_03",
+            "adapter_id": 16,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_03",
+            "adapter_id": 17,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_04",
+            "adapter_id": 18,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_04",
+            "adapter_id": 19,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_04",
+            "adapter_id": 20,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_04",
+            "adapter_id": 21,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_04",
+            "adapter_id": 22,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_04",
+            "adapter_id": 23,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_05",
+            "adapter_id": 24,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_05",
+            "adapter_id": 25,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_05",
+            "adapter_id": 26,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_05",
+            "adapter_id": 27,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_05",
+            "adapter_id": 28,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_05",
+            "adapter_id": 29,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_06",
+            "adapter_id": 30,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_06",
+            "adapter_id": 31,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          }
+        ],
+        "job_groups": [
+          {
+            "adapter_ids": [
+              0,
+              1,
+              6,
+              7,
+              12,
+              13,
+              18,
+              19
+            ],
+            "ranks": [
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4
+            ],
+            "job_names": [
+              "math_01",
+              "open_qa_01",
+              "math_02",
+              "open_qa_02",
+              "math_03",
+              "open_qa_03",
+              "math_04",
+              "open_qa_04"
+            ],
+            "rank_span": 0
+          },
+          {
+            "adapter_ids": [
+              24,
+              25,
+              30,
+              31,
+              2,
+              3,
+              8,
+              9
+            ],
+            "ranks": [
+              4,
+              4,
+              4,
+              4,
+              8,
+              8,
+              8,
+              8
+            ],
+            "job_names": [
+              "math_05",
+              "open_qa_05",
+              "math_06",
+              "open_qa_06",
+              "closed_qa_01",
+              "classification_01",
+              "closed_qa_02",
+              "classification_02"
+            ],
+            "rank_span": 4
+          },
+          {
+            "adapter_ids": [
+              14,
+              15,
+              20,
+              21,
+              26,
+              27,
+              4,
+              5
+            ],
+            "ranks": [
+              8,
+              8,
+              8,
+              8,
+              8,
+              8,
+              16,
+              16
+            ],
+            "job_names": [
+              "closed_qa_03",
+              "classification_03",
+              "closed_qa_04",
+              "classification_04",
+              "closed_qa_05",
+              "classification_05",
+              "information_extraction_01",
+              "summarization_01"
+            ],
+            "rank_span": 8
+          },
+          {
+            "adapter_ids": [
+              10,
+              11,
+              16,
+              17,
+              22,
+              23,
+              28,
+              29
+            ],
+            "ranks": [
+              16,
+              16,
+              16,
+              16,
+              16,
+              16,
+              16,
+              16
+            ],
+            "job_names": [
+              "information_extraction_02",
+              "summarization_02",
+              "information_extraction_03",
+              "summarization_03",
+              "information_extraction_04",
+              "summarization_04",
+              "information_extraction_05",
+              "summarization_05"
+            ],
+            "rank_span": 0
+          }
+        ],
+        "dataset_examples": 1024,
+        "num_batches": 256,
+        "total_examples_seen": 1024,
+        "total_tokens_seen": 131072,
+        "adapter_example_counts": {
+          "0": 32,
+          "1": 32,
+          "2": 32,
+          "3": 32,
+          "4": 32,
+          "5": 32,
+          "6": 32,
+          "7": 32,
+          "8": 32,
+          "9": 32,
+          "10": 32,
+          "11": 32,
+          "12": 32,
+          "13": 32,
+          "14": 32,
+          "15": 32,
+          "16": 32,
+          "17": 32,
+          "18": 32,
+          "19": 32,
+          "20": 32,
+          "21": 32,
+          "22": 32,
+          "23": 32,
+          "24": 32,
+          "25": 32,
+          "26": 32,
+          "27": 32,
+          "28": 32,
+          "29": 32,
+          "30": 32,
+          "31": 32
+        },
+        "first_batch_adapter_ids": [
+          [
+            0
+          ],
+          [
+            12
+          ],
+          [
+            0
+          ],
+          [
+            12
+          ],
+          [
+            0
+          ]
+        ]
+      },
+      "benchmark_suites": {
+        "shared_backbone_runtime": {
+          "selected": true,
+          "headline_role": "raw_topology_profile",
+          "comparison_note": "Use this suite to profile the runtime exactly as launched. Do not use it as the headline speedup against paper-style baselines unless the topology and batch-sizing policy also match.",
+          "grouped_forward_backward": {
+            "config_summary": {
+              "base_model": "pythia-2.8b",
+              "world_size": 4,
+              "launched_processes": 4,
+              "distributed_mode": "ddp",
+              "effective_data_parallel_world_size": 4,
+              "num_adapters": 32,
+              "rank": [
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4
+              ],
+              "alpha": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "benchmark_steps": 1,
+              "warmup_steps": 1,
+              "benchmark_scope": "whole_dataset",
+              "execution_mode": "forward_backward",
+              "backends": [
+                "cuda"
+              ],
+              "batch_size_per_rank": 1,
+              "global_batch_size": 4
+            },
+            "benchmark": {
+              "batched_cuda": {
+                "avg_pass_time_s": 78.84584492596332,
+                "pass_times_s": [
+                  78.84584492596332
+                ],
+                "examples_per_second": 12.98736795783648,
+                "tokens_per_second": 1662.3830986030694,
+                "final_loss": 3.121835231781006,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.121835231781006,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  9448.21875
+                ],
+                "avg_peak_memory_mb": 9448.21875,
+                "max_peak_memory_mb": 9448.21875
+              }
+            },
+            "speedup": {}
+          }
+        },
+        "project_paper_baseline": {
+          "selected": true,
+          "topology": "multi_gpu_local_colocation",
+          "paper_analogue": "tLoRA/mLoRA-style multi-job baseline",
+          "recommended_claim": "aggregate throughput and job-turnaround under shared backbone execution",
+          "primary_baseline": "independent_single_lora",
+          "fairness_protocol": "cluster_style_preserve_per_job_batch",
+          "reference_batch_policy": "scale_with_local_jobs",
+          "reference_batch_size_search": "none",
+          "reference_batch_size_search_max_multiplier": 64,
+          "grouped_forward_backward": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 4,
+            "job_assignment": "round_robin_by_job_index",
+            "reference_batch_policy": "scale_with_local_jobs",
+            "reference_batch_size_search": "none",
+            "reference_batch_size_search_max_multiplier": 64,
+            "rank_shards": [
+              {
+                "rank": 0,
+                "job_names": [
+                  "math_01",
+                  "information_extraction_01",
+                  "closed_qa_02",
+                  "math_03",
+                  "information_extraction_03",
+                  "closed_qa_04",
+                  "math_05",
+                  "information_extraction_05"
+                ],
+                "num_jobs": 8
+              },
+              {
+                "rank": 1,
+                "job_names": [
+                  "open_qa_01",
+                  "summarization_01",
+                  "classification_02",
+                  "open_qa_03",
+                  "summarization_03",
+                  "classification_04",
+                  "open_qa_05",
+                  "summarization_05"
+                ],
+                "num_jobs": 8
+              },
+              {
+                "rank": 2,
+                "job_names": [
+                  "closed_qa_01",
+                  "math_02",
+                  "information_extraction_02",
+                  "closed_qa_03",
+                  "math_04",
+                  "information_extraction_04",
+                  "closed_qa_05",
+                  "math_06"
+                ],
+                "num_jobs": 8
+              },
+              {
+                "rank": 3,
+                "job_names": [
+                  "classification_01",
+                  "open_qa_02",
+                  "summarization_02",
+                  "classification_03",
+                  "open_qa_04",
+                  "summarization_04",
+                  "classification_05",
+                  "open_qa_06"
+                ],
+                "num_jobs": 8
+              }
+            ],
+            "runtime": {
+              "config_summary": {
+                "base_model": "pythia-2.8b",
+                "world_size": 4,
+                "launched_processes": 4,
+                "distributed_mode": "local",
+                "effective_data_parallel_world_size": 1,
+                "num_adapters": 32,
+                "rank": [
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4
+                ],
+                "alpha": [
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0
+                ],
+                "benchmark_steps": 1,
+                "warmup_steps": 0,
+                "benchmark_scope": "whole_dataset",
+                "execution_mode": "forward_backward",
+                "backends": [
+                  "cuda"
+                ]
+              },
+              "benchmark": {
+                "batched_cuda": {
+                  "avg_pass_time_s": 17.365079491981305,
+                  "pass_times_s": [
+                    17.365079491981305
+                  ],
+                  "examples_per_second": 58.96892095845883,
+                  "tokens_per_second": 7548.02188268273,
+                  "final_loss": 4.718101620674133,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 4.718101620674133,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 9239.62890625,
+                  "max_peak_memory_mb": 9239.62890625,
+                  "gpu_slots": 4,
+                  "estimated_makespan_s": 17.365079491981305,
+                  "gpu_seconds_per_pass": 69.46031796792522,
+                  "tokens_per_second_per_gpu": 1887.0054706706826,
+                  "examples_per_second_per_gpu": 14.742230239614708,
+                  "max_peak_memory_mb_per_gpu": 9239.62890625,
+                  "avg_peak_memory_mb_per_gpu": 9239.62890625
+                }
+              },
+              "speedup": {}
+            }
+          },
+          "independent_single_lora": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 4,
+            "job_assignment": "round_robin_by_job_index",
+            "batch_sizing_policy": "auto_backoff_on_oom",
+            "reference_batch_size_search": "none",
+            "reference_batch_size_search_max_multiplier": 64,
+            "job_results": {
+              "math_01": {
+                "avg_pass_time_s": 3.1100227009737864,
+                "pass_times_s": [
+                  3.1100227009737864
+                ],
+                "examples_per_second": 10.28931396223584,
+                "tokens_per_second": 1317.0321871661874,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_01": {
+                "avg_pass_time_s": 3.6644816709449515,
+                "pass_times_s": [
+                  3.6644816709449515
+                ],
+                "examples_per_second": 8.732476479203738,
+                "tokens_per_second": 1117.7569893380785,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_02": {
+                "avg_pass_time_s": 3.131235611042939,
+                "pass_times_s": [
+                  3.131235611042939
+                ],
+                "examples_per_second": 10.219607840159167,
+                "tokens_per_second": 1308.1098035403734,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "math_03": {
+                "avg_pass_time_s": 3.4033701419830322,
+                "pass_times_s": [
+                  3.4033701419830322
+                ],
+                "examples_per_second": 9.402444831156288,
+                "tokens_per_second": 1203.5129383880048,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_03": {
+                "avg_pass_time_s": 3.43148712196853,
+                "pass_times_s": [
+                  3.43148712196853
+                ],
+                "examples_per_second": 9.325402912088641,
+                "tokens_per_second": 1193.651572747346,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_04": {
+                "avg_pass_time_s": 3.6158854980021715,
+                "pass_times_s": [
+                  3.6158854980021715
+                ],
+                "examples_per_second": 8.849837755559587,
+                "tokens_per_second": 1132.7792327116272,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "math_05": {
+                "avg_pass_time_s": 3.5392306350404397,
+                "pass_times_s": [
+                  3.5392306350404397
+                ],
+                "examples_per_second": 9.041513057437232,
+                "tokens_per_second": 1157.3136713519657,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_05": {
+                "avg_pass_time_s": 3.5959607070544735,
+                "pass_times_s": [
+                  3.5959607070544735
+                ],
+                "examples_per_second": 8.898873654882584,
+                "tokens_per_second": 1139.0558278249707,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_01": {
+                "avg_pass_time_s": 3.762440077960491,
+                "pass_times_s": [
+                  3.762440077960491
+                ],
+                "examples_per_second": 8.505118842277021,
+                "tokens_per_second": 1088.6552118114587,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_01": {
+                "avg_pass_time_s": 3.2593672400107607,
+                "pass_times_s": [
+                  3.2593672400107607
+                ],
+                "examples_per_second": 9.817856548099304,
+                "tokens_per_second": 1256.6856381567109,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_02": {
+                "avg_pass_time_s": 3.216605911962688,
+                "pass_times_s": [
+                  3.216605911962688
+                ],
+                "examples_per_second": 9.948374428148224,
+                "tokens_per_second": 1273.3919268029726,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_03": {
+                "avg_pass_time_s": 3.1127268789568916,
+                "pass_times_s": [
+                  3.1127268789568916
+                ],
+                "examples_per_second": 10.280375132277442,
+                "tokens_per_second": 1315.8880169315125,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_03": {
+                "avg_pass_time_s": 3.0676465969299898,
+                "pass_times_s": [
+                  3.0676465969299898
+                ],
+                "examples_per_second": 10.431449317540245,
+                "tokens_per_second": 1335.2255126451514,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_04": {
+                "avg_pass_time_s": 3.1884289250010625,
+                "pass_times_s": [
+                  3.1884289250010625
+                ],
+                "examples_per_second": 10.036290835615644,
+                "tokens_per_second": 1284.6452269588024,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_05": {
+                "avg_pass_time_s": 3.3992349619511515,
+                "pass_times_s": [
+                  3.3992349619511515
+                ],
+                "examples_per_second": 9.41388293489194,
+                "tokens_per_second": 1204.9770156661684,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_05": {
+                "avg_pass_time_s": 3.515389615902677,
+                "pass_times_s": [
+                  3.515389615902677
+                ],
+                "examples_per_second": 9.1028316904734,
+                "tokens_per_second": 1165.1624563805951,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_01": {
+                "avg_pass_time_s": 3.017910485039465,
+                "pass_times_s": [
+                  3.017910485039465
+                ],
+                "examples_per_second": 10.603362875947441,
+                "tokens_per_second": 1357.2304481212725,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "math_02": {
+                "avg_pass_time_s": 3.021733467001468,
+                "pass_times_s": [
+                  3.021733467001468
+                ],
+                "examples_per_second": 10.589947905549161,
+                "tokens_per_second": 1355.5133319102927,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_02": {
+                "avg_pass_time_s": 3.523476229980588,
+                "pass_times_s": [
+                  3.523476229980588
+                ],
+                "examples_per_second": 9.08194008170627,
+                "tokens_per_second": 1162.4883304584025,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_03": {
+                "avg_pass_time_s": 3.2832767750369385,
+                "pass_times_s": [
+                  3.2832767750369385
+                ],
+                "examples_per_second": 9.746360783013788,
+                "tokens_per_second": 1247.5341802257649,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "math_04": {
+                "avg_pass_time_s": 3.2085660010343418,
+                "pass_times_s": [
+                  3.2085660010343418
+                ],
+                "examples_per_second": 9.973302712078915,
+                "tokens_per_second": 1276.5827471461012,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "information_extraction_04": {
+                "avg_pass_time_s": 3.4136141559574753,
+                "pass_times_s": [
+                  3.4136141559574753
+                ],
+                "examples_per_second": 9.374228761078127,
+                "tokens_per_second": 1199.9012814180003,
+                "final_loss": 3.151165246963501,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.151165246963501,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "closed_qa_05": {
+                "avg_pass_time_s": 3.3590189600363374,
+                "pass_times_s": [
+                  3.3590189600363374
+                ],
+                "examples_per_second": 9.52659106147285,
+                "tokens_per_second": 1219.4036558685248,
+                "final_loss": 2.4996895790100098,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 2.4996895790100098,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "math_06": {
+                "avg_pass_time_s": 3.3266328409081325,
+                "pass_times_s": [
+                  3.3266328409081325
+                ],
+                "examples_per_second": 9.619336286977907,
+                "tokens_per_second": 1231.275044733172,
+                "final_loss": 8.139556884765625,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 8.139556884765625,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_01": {
+                "avg_pass_time_s": 3.0805681080091745,
+                "pass_times_s": [
+                  3.0805681080091745
+                ],
+                "examples_per_second": 10.387694372607164,
+                "tokens_per_second": 1329.624879693717,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_02": {
+                "avg_pass_time_s": 3.526849967078306,
+                "pass_times_s": [
+                  3.526849967078306
+                ],
+                "examples_per_second": 9.073252420348709,
+                "tokens_per_second": 1161.3763098046347,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_02": {
+                "avg_pass_time_s": 3.080380921019241,
+                "pass_times_s": [
+                  3.080380921019241
+                ],
+                "examples_per_second": 10.388325606630426,
+                "tokens_per_second": 1329.7056776486945,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_03": {
+                "avg_pass_time_s": 3.113145117997192,
+                "pass_times_s": [
+                  3.113145117997192
+                ],
+                "examples_per_second": 10.2789940035262,
+                "tokens_per_second": 1315.7112324513537,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_04": {
+                "avg_pass_time_s": 3.107064046082087,
+                "pass_times_s": [
+                  3.107064046082087
+                ],
+                "examples_per_second": 10.299111806321156,
+                "tokens_per_second": 1318.286311209108,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "summarization_04": {
+                "avg_pass_time_s": 3.224689746974036,
+                "pass_times_s": [
+                  3.224689746974036
+                ],
+                "examples_per_second": 9.923435279325075,
+                "tokens_per_second": 1270.1997157536096,
+                "final_loss": 3.0925052165985107,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.0925052165985107,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5809.298828125
+                ],
+                "avg_peak_memory_mb": 5809.298828125,
+                "max_peak_memory_mb": 5809.298828125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "classification_05": {
+                "avg_pass_time_s": 3.2532445829128847,
+                "pass_times_s": [
+                  3.2532445829128847
+                ],
+                "examples_per_second": 9.836333907408799,
+                "tokens_per_second": 1259.0507401483262,
+                "final_loss": 10.138158798217773,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 10.138158798217773,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5787.931640625
+                ],
+                "avg_peak_memory_mb": 5787.931640625,
+                "max_peak_memory_mb": 5787.931640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              },
+              "open_qa_06": {
+                "avg_pass_time_s": 3.5760295189684257,
+                "pass_times_s": [
+                  3.5760295189684257
+                ],
+                "examples_per_second": 8.948471993942325,
+                "tokens_per_second": 1145.4044152246177,
+                "final_loss": 16.052814483642578,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 16.052814483642578,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  5777.40234375
+                ],
+                "avg_peak_memory_mb": 5777.40234375,
+                "max_peak_memory_mb": 5777.40234375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 1,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false
+              }
+            },
+            "aggregate": {
+              "avg_pass_time_s": 27.491674087010324,
+              "pass_times_s": [
+                27.491674087010324
+              ],
+              "examples_per_second": 37.247640749671,
+              "tokens_per_second": 4767.698015957888,
+              "max_peak_memory_mb": 5809.298828125,
+              "num_jobs": 32,
+              "avg_job_completion_time_s": 3.3165536006163165,
+              "p50_job_completion_time_s": 3.2713220075238496,
+              "p95_job_completion_time_s": 3.6377537758264227,
+              "max_job_completion_time_s": 3.762440077960491
+            }
+          },
+          "speedup_vs_primary_baseline": {
+            "batched_cuda_vs_independent_single_lora": 1.5831585510279518
+          },
+          "cluster_efficiency": {
+            "baseline": "independent_single_lora",
+            "gpu_slots": 4,
+            "baseline_avg_pass_time_s": 27.491674087010324,
+            "baseline_tokens_per_second": 4767.698015957888,
+            "baseline_examples_per_second": 37.247640749671,
+            "baseline_max_peak_memory_mb_per_gpu": 5809.298828125,
+            "baseline_avg_job_completion_time_s": 3.3165536006163165,
+            "baseline_p95_job_completion_time_s": 3.6377537758264227,
+            "cases": {
+              "batched_cuda": {
+                "grouped_avg_pass_time_s": 17.365079491981305,
+                "grouped_tokens_per_second": 7548.02188268273,
+                "grouped_examples_per_second": 58.96892095845883,
+                "grouped_max_peak_memory_mb_per_gpu": 9239.62890625,
+                "speedup_vs_baseline_time": 1.5831585510279518,
+                "tokens_per_second_ratio_vs_baseline": 1.5831585510279518,
+                "examples_per_second_ratio_vs_baseline": 1.5831585510279518,
+                "grouped_gpu_seconds_per_pass": 69.46031796792522,
+                "baseline_gpu_seconds_per_pass": 109.9666963480413,
+                "grouped_peak_memory_fraction": 0.2819710969924927,
+                "baseline_peak_memory_fraction": 0.17728573083877563
+              }
+            }
+          }
+        },
+        "single_gpu_reference": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the single-GPU reference suite."
+        },
+        "multi_gpu_local_colocation": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the local co-location suite."
+        },
+        "matched_multi_adapter_reference": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the matched multi-adapter reference suite."
+        }
+      }
+    }
+  }
+}

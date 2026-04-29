@@ -1,0 +1,2424 @@
+{
+  "config_summary": {
+    "base_model": "pythia-2.8b",
+    "workloads": [
+      "mixed_tasks_16way_dense",
+      "mixed_tasks_16way_rank_skew"
+    ],
+    "backends": [
+      "cuda"
+    ],
+    "hardware": {
+      "gpu_count": 4,
+      "gpu_model": "Tesla V100-SXM2-32GB",
+      "gpu_memory_gb": 32
+    },
+    "world_size": 4,
+    "launched_processes": 4,
+    "max_length": 128,
+    "samples_per_job": 32,
+    "optimizer_lr": 2e-05,
+    "max_grad_norm": 1.0,
+    "benchmark_scope": "whole_dataset",
+    "benchmark_steps": 1,
+    "warmup_steps": 1,
+    "device": "cuda",
+    "include_kernel_microbench": false,
+    "include_train_step_benchmark": false,
+    "train_benchmark_steps": 1,
+    "train_benchmark_scope": "single_batch",
+    "include_baseline_lora": true,
+    "baseline_workloads": [
+      "mixed_tasks_16way_dense",
+      "mixed_tasks_16way_rank_skew"
+    ],
+    "baseline_backends": [
+      "cuda"
+    ],
+    "baseline_benchmark_steps": 1,
+    "baseline_warmup_steps": 0,
+    "baseline_benchmark_scope": "whole_dataset",
+    "baseline_atol": 0.0001,
+    "reference_suites": [
+      "multi_gpu_local_colocation"
+    ],
+    "reference_batch_policy": "fixed_total_batch",
+    "reference_batch_size_search": "max_fit",
+    "reference_batch_size_search_max_multiplier": 256,
+    "use_tiny_datasets": false,
+    "seed": 0
+  },
+  "benchmark_design": {
+    "kernel_microbench": "Optional synthetic operator benchmark. Keep it separate from end-to-end workload results.",
+    "shared_backbone_runtime": "Grouped LoRA runtime under the currently launched topology. On torchrun this is the DDP-style path; use it for raw profiling, not as the headline paper-style speedup unless the topology and batch-sizing policy match the baseline suite.",
+    "project_paper_baseline": "Topology-aware headline baseline aligned with prior multi-LoRA systems work: serial single-LoRA on one GPU, and independent single-LoRA colocation on multi-GPU.",
+    "single_gpu_reference": "Single-GPU grouped-versus-serial baseline intended to mirror paper-style one-GPU PEFT comparisons.",
+    "multi_gpu_local_colocation": "Local-only multi-GPU packing benchmark: jobs are sharded across GPUs, and each GPU runs without DDP.",
+    "reference_batch_size_search": "Optional fair-eval mode: search for the largest fitting input batch per compared method under the same GPU memory budget.",
+    "headline_guidance": "For final speedups, use project_paper_baseline.speedup_vs_primary_baseline. shared_backbone_runtime is the raw launched topology and may not be directly comparable to the paper baseline suite.",
+    "cluster_efficiency": "Derived multi-job systems metrics for aggregate throughput, pass makespan, GPU-seconds, per-GPU throughput, per-job baseline completion time, and peak memory. This is the most direct block for the tLoRA/mLoRA-style cluster claim.",
+    "matched_multi_adapter_reference": "Same-workload correctness and performance reference against the project's baseline LoRA path when rank and alpha match."
+  },
+  "workloads": {
+    "mixed_tasks_16way_dense": {
+      "workload": {
+        "description": "16 equal-rank adapters across repeated instruction-tuning task families, designed to stress high-concurrency shared-backbone throughput.",
+        "jobs": [
+          {
+            "name": "math_01",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_01",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_01",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "classification_01",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_01",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "summarization_01",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "math_02",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_02",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_02",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "classification_02",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_02",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "summarization_02",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "math_03",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_03",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_03",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "classification_03",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 4,
+            "samples": 32
+          }
+        ],
+        "batch_size": 1,
+        "grouped_batching_strategy": "chunked",
+        "job_scheduler": {}
+      },
+      "scheduler_and_groupdata": {
+        "num_jobs": 16,
+        "num_job_groups": 1,
+        "world_size": 4,
+        "jobs": [
+          {
+            "name": "math_01",
+            "adapter_id": 0,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_01",
+            "adapter_id": 1,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_01",
+            "adapter_id": 2,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_01",
+            "adapter_id": 3,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_01",
+            "adapter_id": 4,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_01",
+            "adapter_id": 5,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_02",
+            "adapter_id": 6,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_02",
+            "adapter_id": 7,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_02",
+            "adapter_id": 8,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_02",
+            "adapter_id": 9,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_02",
+            "adapter_id": 10,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_02",
+            "adapter_id": 11,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_03",
+            "adapter_id": 12,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_03",
+            "adapter_id": 13,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_03",
+            "adapter_id": 14,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_03",
+            "adapter_id": 15,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          }
+        ],
+        "job_groups": [
+          {
+            "adapter_ids": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15
+            ],
+            "ranks": [
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              4
+            ],
+            "job_names": [
+              "math_01",
+              "open_qa_01",
+              "closed_qa_01",
+              "classification_01",
+              "information_extraction_01",
+              "summarization_01",
+              "math_02",
+              "open_qa_02",
+              "closed_qa_02",
+              "classification_02",
+              "information_extraction_02",
+              "summarization_02",
+              "math_03",
+              "open_qa_03",
+              "closed_qa_03",
+              "classification_03"
+            ],
+            "rank_span": 0
+          }
+        ],
+        "dataset_examples": 512,
+        "num_batches": 128,
+        "total_examples_seen": 512,
+        "total_tokens_seen": 65536,
+        "adapter_example_counts": {
+          "0": 32,
+          "1": 32,
+          "2": 32,
+          "3": 32,
+          "4": 32,
+          "5": 32,
+          "6": 32,
+          "7": 32,
+          "8": 32,
+          "9": 32,
+          "10": 32,
+          "11": 32,
+          "12": 32,
+          "13": 32,
+          "14": 32,
+          "15": 32
+        },
+        "first_batch_adapter_ids": [
+          [
+            0
+          ],
+          [
+            4
+          ],
+          [
+            8
+          ],
+          [
+            12
+          ],
+          [
+            0
+          ]
+        ]
+      },
+      "benchmark_suites": {
+        "shared_backbone_runtime": {
+          "selected": true,
+          "headline_role": "raw_topology_profile",
+          "comparison_note": "Use this suite to profile the runtime exactly as launched. Do not use it as the headline speedup against paper-style baselines unless the topology and batch-sizing policy also match.",
+          "grouped_forward_backward": {
+            "config_summary": {
+              "base_model": "pythia-2.8b",
+              "world_size": 4,
+              "launched_processes": 4,
+              "distributed_mode": "ddp",
+              "effective_data_parallel_world_size": 4,
+              "num_adapters": 16,
+              "rank": [
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4,
+                4
+              ],
+              "alpha": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "benchmark_steps": 1,
+              "warmup_steps": 1,
+              "benchmark_scope": "whole_dataset",
+              "execution_mode": "forward_backward",
+              "backends": [
+                "cuda"
+              ],
+              "batch_size_per_rank": 1,
+              "global_batch_size": 4
+            },
+            "benchmark": {
+              "batched_cuda": {
+                "avg_pass_time_s": 37.09359539800789,
+                "pass_times_s": [
+                  37.09359539800789
+                ],
+                "examples_per_second": 13.802921892750707,
+                "tokens_per_second": 1766.7740022720905,
+                "final_loss": 9.207554936408997,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 9.207554936408997,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  6103.9072265625
+                ],
+                "avg_peak_memory_mb": 6103.9072265625,
+                "max_peak_memory_mb": 6103.9072265625
+              }
+            },
+            "speedup": {}
+          }
+        },
+        "project_paper_baseline": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the topology-aware paper baseline suite."
+        },
+        "single_gpu_reference": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the single-GPU reference suite."
+        },
+        "multi_gpu_local_colocation": {
+          "selected": true,
+          "reason": null,
+          "fairness_protocol": "memory_budget_max_fit",
+          "reference_batch_policy": "fixed_total_batch",
+          "reference_batch_size_search": "max_fit",
+          "reference_batch_size_search_max_multiplier": 256,
+          "grouped_forward_backward": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 4,
+            "job_assignment": "round_robin_by_job_index",
+            "reference_batch_policy": "fixed_total_batch",
+            "reference_batch_size_search": "max_fit",
+            "reference_batch_size_search_max_multiplier": 256,
+            "rank_shards": [
+              {
+                "rank": 0,
+                "job_names": [
+                  "math_01",
+                  "information_extraction_01",
+                  "closed_qa_02",
+                  "math_03"
+                ],
+                "num_jobs": 4
+              },
+              {
+                "rank": 1,
+                "job_names": [
+                  "open_qa_01",
+                  "summarization_01",
+                  "classification_02",
+                  "open_qa_03"
+                ],
+                "num_jobs": 4
+              },
+              {
+                "rank": 2,
+                "job_names": [
+                  "closed_qa_01",
+                  "math_02",
+                  "information_extraction_02",
+                  "closed_qa_03"
+                ],
+                "num_jobs": 4
+              },
+              {
+                "rank": 3,
+                "job_names": [
+                  "classification_01",
+                  "open_qa_02",
+                  "summarization_02",
+                  "classification_03"
+                ],
+                "num_jobs": 4
+              }
+            ],
+            "runtime": {
+              "config_summary": {
+                "base_model": "pythia-2.8b",
+                "world_size": 4,
+                "launched_processes": 4,
+                "distributed_mode": "local",
+                "effective_data_parallel_world_size": 1,
+                "num_adapters": 16,
+                "rank": [
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4,
+                  4
+                ],
+                "alpha": [
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0
+                ],
+                "benchmark_steps": 1,
+                "warmup_steps": 0,
+                "benchmark_scope": "whole_dataset",
+                "execution_mode": "forward_backward",
+                "backends": [
+                  "cuda"
+                ]
+              },
+              "benchmark": {
+                "batched_cuda": {
+                  "avg_pass_time_s": 5.366932453005575,
+                  "pass_times_s": [
+                    5.366932453005575
+                  ],
+                  "examples_per_second": 95.39900203388459,
+                  "tokens_per_second": 12211.072260337227,
+                  "final_loss": 6.0653292536735535,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 6.0653292536735535,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 19921.1611328125,
+                  "max_peak_memory_mb": 19921.5517578125,
+                  "gpu_slots": 4,
+                  "estimated_makespan_s": 5.366932453005575,
+                  "gpu_seconds_per_pass": 21.4677298120223,
+                  "tokens_per_second_per_gpu": 3052.7680650843067,
+                  "examples_per_second_per_gpu": 23.849750508471146,
+                  "max_peak_memory_mb_per_gpu": 19921.5517578125,
+                  "avg_peak_memory_mb_per_gpu": 19921.1611328125
+                }
+              },
+              "speedup": {}
+            }
+          },
+          "independent_single_lora": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 4,
+            "job_assignment": "round_robin_by_job_index",
+            "batch_sizing_policy": "max_fit_then_auto_backoff_on_oom",
+            "reference_batch_size_search": "max_fit",
+            "reference_batch_size_search_max_multiplier": 256,
+            "job_results": {
+              "math_01": {
+                "avg_pass_time_s": 0.9771738040726632,
+                "pass_times_s": [
+                  0.9771738040726632
+                ],
+                "examples_per_second": 32.74750087101236,
+                "tokens_per_second": 4191.6801114895825,
+                "final_loss": 3.3816583156585693,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.3816583156585693,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "information_extraction_01": {
+                "avg_pass_time_s": 1.0331463540205732,
+                "pass_times_s": [
+                  1.0331463540205732
+                ],
+                "examples_per_second": 30.973346491975114,
+                "tokens_per_second": 3964.5883509728146,
+                "final_loss": 3.3581435680389404,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.3581435680389404,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "closed_qa_02": {
+                "avg_pass_time_s": 1.0436084299581125,
+                "pass_times_s": [
+                  1.0436084299581125
+                ],
+                "examples_per_second": 30.6628416189436,
+                "tokens_per_second": 3924.8437272247807,
+                "final_loss": 3.307797431945801,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.307797431945801,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "math_03": {
+                "avg_pass_time_s": 1.0440124811138958,
+                "pass_times_s": [
+                  1.0440124811138958
+                ],
+                "examples_per_second": 30.650974561011004,
+                "tokens_per_second": 3923.3247438094086,
+                "final_loss": 3.3816583156585693,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.3816583156585693,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "open_qa_01": {
+                "avg_pass_time_s": 1.0790054299868643,
+                "pass_times_s": [
+                  1.0790054299868643
+                ],
+                "examples_per_second": 29.65694065171624,
+                "tokens_per_second": 3796.088403419679,
+                "final_loss": 11.296689987182617,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.296689987182617,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "summarization_01": {
+                "avg_pass_time_s": 1.045723070972599,
+                "pass_times_s": [
+                  1.045723070972599
+                ],
+                "examples_per_second": 30.600835812331898,
+                "tokens_per_second": 3916.906983978483,
+                "final_loss": 3.200284957885742,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.200284957885742,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "classification_02": {
+                "avg_pass_time_s": 1.0695950411027297,
+                "pass_times_s": [
+                  1.0695950411027297
+                ],
+                "examples_per_second": 29.9178649585068,
+                "tokens_per_second": 3829.4867146888705,
+                "final_loss": 11.5958833694458,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.5958833694458,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "open_qa_03": {
+                "avg_pass_time_s": 1.092539735022001,
+                "pass_times_s": [
+                  1.092539735022001
+                ],
+                "examples_per_second": 29.28955256657608,
+                "tokens_per_second": 3749.0627285217383,
+                "final_loss": 11.296689987182617,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.296689987182617,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "closed_qa_01": {
+                "avg_pass_time_s": 1.0919670700095594,
+                "pass_times_s": [
+                  1.0919670700095594
+                ],
+                "examples_per_second": 29.304913013283326,
+                "tokens_per_second": 3751.0288657002657,
+                "final_loss": 3.307797431945801,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.307797431945801,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "math_02": {
+                "avg_pass_time_s": 1.0230051530525088,
+                "pass_times_s": [
+                  1.0230051530525088
+                ],
+                "examples_per_second": 31.280389844094465,
+                "tokens_per_second": 4003.8899000440915,
+                "final_loss": 3.3816583156585693,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.3816583156585693,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "information_extraction_02": {
+                "avg_pass_time_s": 1.0685962380375713,
+                "pass_times_s": [
+                  1.0685962380375713
+                ],
+                "examples_per_second": 29.945828799441173,
+                "tokens_per_second": 3833.06608632847,
+                "final_loss": 3.3581435680389404,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.3581435680389404,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "closed_qa_03": {
+                "avg_pass_time_s": 1.1853134960401803,
+                "pass_times_s": [
+                  1.1853134960401803
+                ],
+                "examples_per_second": 26.99707723475988,
+                "tokens_per_second": 3455.625886049265,
+                "final_loss": 3.307797431945801,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.307797431945801,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "classification_01": {
+                "avg_pass_time_s": 1.0435605549719185,
+                "pass_times_s": [
+                  1.0435605549719185
+                ],
+                "examples_per_second": 30.66424832515934,
+                "tokens_per_second": 3925.0237856203953,
+                "final_loss": 11.5958833694458,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.5958833694458,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "open_qa_02": {
+                "avg_pass_time_s": 1.0473233259981498,
+                "pass_times_s": [
+                  1.0473233259981498
+                ],
+                "examples_per_second": 30.554079342692432,
+                "tokens_per_second": 3910.9221558646313,
+                "final_loss": 11.296689987182617,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.296689987182617,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "summarization_02": {
+                "avg_pass_time_s": 1.050826849997975,
+                "pass_times_s": [
+                  1.050826849997975
+                ],
+                "examples_per_second": 30.452210085859214,
+                "tokens_per_second": 3897.8828909899794,
+                "final_loss": 3.200284957885742,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.200284957885742,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "classification_03": {
+                "avg_pass_time_s": 1.0706908609718084,
+                "pass_times_s": [
+                  1.0706908609718084
+                ],
+                "examples_per_second": 29.887244924230814,
+                "tokens_per_second": 3825.567350301544,
+                "final_loss": 11.5958833694458,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.5958833694458,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              }
+            },
+            "aggregate": {
+              "avg_pass_time_s": 4.36888195713982,
+              "pass_times_s": [
+                4.36888195713982
+              ],
+              "examples_per_second": 117.19245450504036,
+              "tokens_per_second": 15000.634176645166,
+              "max_peak_memory_mb": 17762.02099609375,
+              "num_jobs": 16,
+              "avg_job_completion_time_s": 1.0603804934580694,
+              "p50_job_completion_time_s": 1.0490750879980624,
+              "p95_job_completion_time_s": 1.1157331752765458,
+              "max_job_completion_time_s": 1.1853134960401803
+            }
+          },
+          "speedup_vs_independent_single_lora": {
+            "batched_cuda_vs_independent_single_lora": 0.8140370678027018
+          }
+        },
+        "matched_multi_adapter_reference": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the matched multi-adapter reference suite."
+        }
+      }
+    },
+    "mixed_tasks_16way_rank_skew": {
+      "workload": {
+        "description": "16 adapters with repeated mixed-task families and moderate rank skew, designed to stress scheduler quality under high local concurrency.",
+        "jobs": [
+          {
+            "name": "math_01",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_01",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_01",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_01",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_01",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_01",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_02",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_02",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_02",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_02",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "information_extraction_02",
+            "dataset_type": "dolly_15k",
+            "family": "information_extraction",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "summarization_02",
+            "dataset_type": "dolly_15k",
+            "family": "summarization",
+            "rank": 16,
+            "samples": 32
+          },
+          {
+            "name": "math_03",
+            "dataset_type": "orca_math",
+            "family": "math",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "open_qa_03",
+            "dataset_type": "dolly_15k",
+            "family": "open_qa",
+            "rank": 4,
+            "samples": 32
+          },
+          {
+            "name": "closed_qa_03",
+            "dataset_type": "dolly_15k",
+            "family": "closed_qa",
+            "rank": 8,
+            "samples": 32
+          },
+          {
+            "name": "classification_03",
+            "dataset_type": "dolly_15k",
+            "family": "classification",
+            "rank": 8,
+            "samples": 32
+          }
+        ],
+        "batch_size": 1,
+        "grouped_batching_strategy": "chunked",
+        "job_scheduler": {
+          "max_rank_difference": 8,
+          "max_group_size": 8
+        }
+      },
+      "scheduler_and_groupdata": {
+        "num_jobs": 16,
+        "num_job_groups": 2,
+        "world_size": 4,
+        "jobs": [
+          {
+            "name": "math_01",
+            "adapter_id": 0,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_01",
+            "adapter_id": 1,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_01",
+            "adapter_id": 2,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_01",
+            "adapter_id": 3,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_01",
+            "adapter_id": 4,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_01",
+            "adapter_id": 5,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_02",
+            "adapter_id": 6,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_02",
+            "adapter_id": 7,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_02",
+            "adapter_id": 8,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_02",
+            "adapter_id": 9,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "information_extraction_02",
+            "adapter_id": 10,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "information_extraction",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "summarization_02",
+            "adapter_id": 11,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "summarization",
+              "max_samples": 32
+            },
+            "rank": 16,
+            "alpha": 1.0
+          },
+          {
+            "name": "math_03",
+            "adapter_id": 12,
+            "dataset_type": "orca_math",
+            "dataset_options": {
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "open_qa_03",
+            "adapter_id": 13,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "open_qa",
+              "max_samples": 32
+            },
+            "rank": 4,
+            "alpha": 1.0
+          },
+          {
+            "name": "closed_qa_03",
+            "adapter_id": 14,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "closed_qa",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          },
+          {
+            "name": "classification_03",
+            "adapter_id": 15,
+            "dataset_type": "dolly_15k",
+            "dataset_options": {
+              "category": "classification",
+              "max_samples": 32
+            },
+            "rank": 8,
+            "alpha": 1.0
+          }
+        ],
+        "job_groups": [
+          {
+            "adapter_ids": [
+              0,
+              1,
+              6,
+              7,
+              12,
+              13,
+              2,
+              3
+            ],
+            "ranks": [
+              4,
+              4,
+              4,
+              4,
+              4,
+              4,
+              8,
+              8
+            ],
+            "job_names": [
+              "math_01",
+              "open_qa_01",
+              "math_02",
+              "open_qa_02",
+              "math_03",
+              "open_qa_03",
+              "closed_qa_01",
+              "classification_01"
+            ],
+            "rank_span": 4
+          },
+          {
+            "adapter_ids": [
+              8,
+              9,
+              14,
+              15,
+              4,
+              5,
+              10,
+              11
+            ],
+            "ranks": [
+              8,
+              8,
+              8,
+              8,
+              16,
+              16,
+              16,
+              16
+            ],
+            "job_names": [
+              "closed_qa_02",
+              "classification_02",
+              "closed_qa_03",
+              "classification_03",
+              "information_extraction_01",
+              "summarization_01",
+              "information_extraction_02",
+              "summarization_02"
+            ],
+            "rank_span": 8
+          }
+        ],
+        "dataset_examples": 512,
+        "num_batches": 128,
+        "total_examples_seen": 512,
+        "total_tokens_seen": 65536,
+        "adapter_example_counts": {
+          "0": 32,
+          "1": 32,
+          "2": 32,
+          "3": 32,
+          "4": 32,
+          "5": 32,
+          "6": 32,
+          "7": 32,
+          "8": 32,
+          "9": 32,
+          "10": 32,
+          "11": 32,
+          "12": 32,
+          "13": 32,
+          "14": 32,
+          "15": 32
+        },
+        "first_batch_adapter_ids": [
+          [
+            0
+          ],
+          [
+            12
+          ],
+          [
+            0
+          ],
+          [
+            12
+          ],
+          [
+            0
+          ]
+        ]
+      },
+      "benchmark_suites": {
+        "shared_backbone_runtime": {
+          "selected": true,
+          "headline_role": "raw_topology_profile",
+          "comparison_note": "Use this suite to profile the runtime exactly as launched. Do not use it as the headline speedup against paper-style baselines unless the topology and batch-sizing policy also match.",
+          "grouped_forward_backward": {
+            "config_summary": {
+              "base_model": "pythia-2.8b",
+              "world_size": 4,
+              "launched_processes": 4,
+              "distributed_mode": "ddp",
+              "effective_data_parallel_world_size": 4,
+              "num_adapters": 16,
+              "rank": [
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8,
+                16,
+                16,
+                4,
+                4,
+                8,
+                8
+              ],
+              "alpha": [
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0,
+                1.0
+              ],
+              "benchmark_steps": 1,
+              "warmup_steps": 1,
+              "benchmark_scope": "whole_dataset",
+              "execution_mode": "forward_backward",
+              "backends": [
+                "cuda"
+              ],
+              "batch_size_per_rank": 1,
+              "global_batch_size": 4
+            },
+            "benchmark": {
+              "batched_cuda": {
+                "avg_pass_time_s": 35.65671080502216,
+                "pass_times_s": [
+                  35.65671080502216
+                ],
+                "examples_per_second": 14.359148346568357,
+                "tokens_per_second": 1837.9709883607497,
+                "final_loss": 3.121835231781006,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.121835231781006,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  7475.171875
+                ],
+                "avg_peak_memory_mb": 7475.171875,
+                "max_peak_memory_mb": 7475.171875
+              }
+            },
+            "speedup": {}
+          }
+        },
+        "project_paper_baseline": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the topology-aware paper baseline suite."
+        },
+        "single_gpu_reference": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the single-GPU reference suite."
+        },
+        "multi_gpu_local_colocation": {
+          "selected": true,
+          "reason": null,
+          "fairness_protocol": "memory_budget_max_fit",
+          "reference_batch_policy": "fixed_total_batch",
+          "reference_batch_size_search": "max_fit",
+          "reference_batch_size_search_max_multiplier": 256,
+          "grouped_forward_backward": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 4,
+            "job_assignment": "round_robin_by_job_index",
+            "reference_batch_policy": "fixed_total_batch",
+            "reference_batch_size_search": "max_fit",
+            "reference_batch_size_search_max_multiplier": 256,
+            "rank_shards": [
+              {
+                "rank": 0,
+                "job_names": [
+                  "math_01",
+                  "information_extraction_01",
+                  "closed_qa_02",
+                  "math_03"
+                ],
+                "num_jobs": 4
+              },
+              {
+                "rank": 1,
+                "job_names": [
+                  "open_qa_01",
+                  "summarization_01",
+                  "classification_02",
+                  "open_qa_03"
+                ],
+                "num_jobs": 4
+              },
+              {
+                "rank": 2,
+                "job_names": [
+                  "closed_qa_01",
+                  "math_02",
+                  "information_extraction_02",
+                  "closed_qa_03"
+                ],
+                "num_jobs": 4
+              },
+              {
+                "rank": 3,
+                "job_names": [
+                  "classification_01",
+                  "open_qa_02",
+                  "summarization_02",
+                  "classification_03"
+                ],
+                "num_jobs": 4
+              }
+            ],
+            "runtime": {
+              "config_summary": {
+                "base_model": "pythia-2.8b",
+                "world_size": 4,
+                "launched_processes": 4,
+                "distributed_mode": "local",
+                "effective_data_parallel_world_size": 1,
+                "num_adapters": 16,
+                "rank": [
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8,
+                  16,
+                  16,
+                  4,
+                  4,
+                  8,
+                  8
+                ],
+                "alpha": [
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0
+                ],
+                "benchmark_steps": 1,
+                "warmup_steps": 0,
+                "benchmark_scope": "whole_dataset",
+                "execution_mode": "forward_backward",
+                "backends": [
+                  "cuda"
+                ]
+              },
+              "benchmark": {
+                "batched_cuda": {
+                  "avg_pass_time_s": 5.528593211900443,
+                  "pass_times_s": [
+                    5.528593211900443
+                  ],
+                  "examples_per_second": 92.609454227507,
+                  "tokens_per_second": 11854.010141120896,
+                  "final_loss": 5.127152800559998,
+                  "final_loss_is_finite": true,
+                  "last_finite_loss": 5.127152800559998,
+                  "non_finite_loss_steps": 0,
+                  "optimizer_steps": 0,
+                  "avg_peak_memory_mb": 19587.73046875,
+                  "max_peak_memory_mb": 19587.73046875,
+                  "gpu_slots": 4,
+                  "estimated_makespan_s": 5.528593211900443,
+                  "gpu_seconds_per_pass": 22.11437284760177,
+                  "tokens_per_second_per_gpu": 2963.502535280224,
+                  "examples_per_second_per_gpu": 23.15236355687675,
+                  "max_peak_memory_mb_per_gpu": 19587.73046875,
+                  "avg_peak_memory_mb_per_gpu": 19587.73046875
+                }
+              },
+              "speedup": {}
+            }
+          },
+          "independent_single_lora": {
+            "supported": true,
+            "execution_mode": "forward_backward",
+            "benchmark_scope": "whole_dataset",
+            "gpu_slots": 4,
+            "job_assignment": "round_robin_by_job_index",
+            "batch_sizing_policy": "max_fit_then_auto_backoff_on_oom",
+            "reference_batch_size_search": "max_fit",
+            "reference_batch_size_search_max_multiplier": 256,
+            "job_results": {
+              "math_01": {
+                "avg_pass_time_s": 0.9701425760285929,
+                "pass_times_s": [
+                  0.9701425760285929
+                ],
+                "examples_per_second": 32.98484242491061,
+                "tokens_per_second": 4222.059830388558,
+                "final_loss": 3.3816583156585693,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.3816583156585693,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "information_extraction_01": {
+                "avg_pass_time_s": 1.038242824957706,
+                "pass_times_s": [
+                  1.038242824957706
+                ],
+                "examples_per_second": 30.821306182687614,
+                "tokens_per_second": 3945.1271913840146,
+                "final_loss": 3.3581435680389404,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.3581435680389404,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17805.32470703125
+                ],
+                "avg_peak_memory_mb": 17805.32470703125,
+                "max_peak_memory_mb": 17805.32470703125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "closed_qa_02": {
+                "avg_pass_time_s": 1.0301558040082455,
+                "pass_times_s": [
+                  1.0301558040082455
+                ],
+                "examples_per_second": 31.063262348754257,
+                "tokens_per_second": 3976.097580640545,
+                "final_loss": 3.307797431945801,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.307797431945801,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17776.45556640625
+                ],
+                "avg_peak_memory_mb": 17776.45556640625,
+                "max_peak_memory_mb": 17776.45556640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "math_03": {
+                "avg_pass_time_s": 1.009161347988993,
+                "pass_times_s": [
+                  1.009161347988993
+                ],
+                "examples_per_second": 31.709498251957456,
+                "tokens_per_second": 4058.8157762505543,
+                "final_loss": 3.3816583156585693,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.3816583156585693,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "open_qa_01": {
+                "avg_pass_time_s": 1.0411279880208895,
+                "pass_times_s": [
+                  1.0411279880208895
+                ],
+                "examples_per_second": 30.73589449922457,
+                "tokens_per_second": 3934.194495900745,
+                "final_loss": 11.296689987182617,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.296689987182617,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "summarization_01": {
+                "avg_pass_time_s": 1.0775692811002955,
+                "pass_times_s": [
+                  1.0775692811002955
+                ],
+                "examples_per_second": 29.69646644652408,
+                "tokens_per_second": 3801.1477051550823,
+                "final_loss": 3.200284957885742,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.200284957885742,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17805.32470703125
+                ],
+                "avg_peak_memory_mb": 17805.32470703125,
+                "max_peak_memory_mb": 17805.32470703125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "classification_02": {
+                "avg_pass_time_s": 1.0701197690796107,
+                "pass_times_s": [
+                  1.0701197690796107
+                ],
+                "examples_per_second": 29.90319488025399,
+                "tokens_per_second": 3827.608944672511,
+                "final_loss": 11.5958833694458,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.5958833694458,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17776.45556640625
+                ],
+                "avg_peak_memory_mb": 17776.45556640625,
+                "max_peak_memory_mb": 17776.45556640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "open_qa_03": {
+                "avg_pass_time_s": 1.1286564510082826,
+                "pass_times_s": [
+                  1.1286564510082826
+                ],
+                "examples_per_second": 28.352294421755065,
+                "tokens_per_second": 3629.0936859846483,
+                "final_loss": 11.296689987182617,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.296689987182617,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "closed_qa_01": {
+                "avg_pass_time_s": 1.0357351419515908,
+                "pass_times_s": [
+                  1.0357351419515908
+                ],
+                "examples_per_second": 30.8959295710521,
+                "tokens_per_second": 3954.678985094669,
+                "final_loss": 3.307797431945801,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.307797431945801,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17776.45556640625
+                ],
+                "avg_peak_memory_mb": 17776.45556640625,
+                "max_peak_memory_mb": 17776.45556640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "math_02": {
+                "avg_pass_time_s": 1.0153265480184928,
+                "pass_times_s": [
+                  1.0153265480184928
+                ],
+                "examples_per_second": 31.5169538927659,
+                "tokens_per_second": 4034.1700982740354,
+                "final_loss": 3.3816583156585693,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.3816583156585693,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "information_extraction_02": {
+                "avg_pass_time_s": 1.0476982779800892,
+                "pass_times_s": [
+                  1.0476982779800892
+                ],
+                "examples_per_second": 30.543144598552196,
+                "tokens_per_second": 3909.522508614681,
+                "final_loss": 3.3581435680389404,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.3581435680389404,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17805.32470703125
+                ],
+                "avg_peak_memory_mb": 17805.32470703125,
+                "max_peak_memory_mb": 17805.32470703125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "closed_qa_03": {
+                "avg_pass_time_s": 1.1128902530763298,
+                "pass_times_s": [
+                  1.1128902530763298
+                ],
+                "examples_per_second": 28.753958363408557,
+                "tokens_per_second": 3680.5066705162953,
+                "final_loss": 3.307797431945801,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.307797431945801,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17776.45556640625
+                ],
+                "avg_peak_memory_mb": 17776.45556640625,
+                "max_peak_memory_mb": 17776.45556640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              },
+              "classification_01": {
+                "avg_pass_time_s": 1.0555635809432715,
+                "pass_times_s": [
+                  1.0555635809432715
+                ],
+                "examples_per_second": 30.315558984522937,
+                "tokens_per_second": 3880.391550018936,
+                "final_loss": 11.5958833694458,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.5958833694458,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17776.45556640625
+                ],
+                "avg_peak_memory_mb": 17776.45556640625,
+                "max_peak_memory_mb": 17776.45556640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "open_qa_02": {
+                "avg_pass_time_s": 1.1444876819150522,
+                "pass_times_s": [
+                  1.1444876819150522
+                ],
+                "examples_per_second": 27.960108706853823,
+                "tokens_per_second": 3578.8939144772894,
+                "final_loss": 11.296689987182617,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.296689987182617,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17762.02099609375
+                ],
+                "avg_peak_memory_mb": 17762.02099609375,
+                "max_peak_memory_mb": 17762.02099609375,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "summarization_02": {
+                "avg_pass_time_s": 1.3609789699548855,
+                "pass_times_s": [
+                  1.3609789699548855
+                ],
+                "examples_per_second": 23.512486751401276,
+                "tokens_per_second": 3009.5983041793634,
+                "final_loss": 3.200284957885742,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 3.200284957885742,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17805.32470703125
+                ],
+                "avg_peak_memory_mb": 17805.32470703125,
+                "max_peak_memory_mb": 17805.32470703125,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 6,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": false
+              },
+              "classification_03": {
+                "avg_pass_time_s": 1.0108900120249018,
+                "pass_times_s": [
+                  1.0108900120249018
+                ],
+                "examples_per_second": 31.655273688876576,
+                "tokens_per_second": 4051.875032176202,
+                "final_loss": 11.5958833694458,
+                "final_loss_is_finite": true,
+                "last_finite_loss": 11.5958833694458,
+                "non_finite_loss_steps": 0,
+                "optimizer_steps": 0,
+                "peak_memory_mb_per_pass": [
+                  17776.45556640625
+                ],
+                "avg_peak_memory_mb": 17776.45556640625,
+                "max_peak_memory_mb": 17776.45556640625,
+                "requested_batch_size": 1,
+                "effective_batch_size": 32,
+                "batch_size_backoff_steps": 0,
+                "batch_size_backoff_applied": false,
+                "batch_size_search_policy": "max_fit",
+                "batch_size_search_requested_batch_size": 1,
+                "batch_size_search_effective_batch_size": 32,
+                "batch_size_search_probe_count": 0,
+                "batch_size_search_max_multiplier": 256,
+                "batch_size_search_dataset_cap": 32,
+                "batch_size_search_hard_cap": 32,
+                "batch_size_search_upper_failure_batch_size": null,
+                "batch_size_search_applied": true,
+                "batch_size_search_cache_hit": true
+              }
+            },
+            "aggregate": {
+              "avg_pass_time_s": 4.571920244838111,
+              "pass_times_s": [
+                4.571920244838111
+              ],
+              "examples_per_second": 111.98795529691695,
+              "tokens_per_second": 14334.45827800537,
+              "max_peak_memory_mb": 17805.32470703125,
+              "num_jobs": 16,
+              "avg_job_completion_time_s": 1.0717966567535768,
+              "p50_job_completion_time_s": 1.0444131330004893,
+              "p95_job_completion_time_s": 1.1986105039250106,
+              "max_job_completion_time_s": 1.3609789699548855
+            }
+          },
+          "speedup_vs_independent_single_lora": {
+            "batched_cuda_vs_independent_single_lora": 0.8269590598557571
+          }
+        },
+        "matched_multi_adapter_reference": {
+          "selected": false,
+          "reason": "Enable include_baseline_lora and select the workload to run the matched multi-adapter reference suite."
+        }
+      }
+    }
+  }
+}
