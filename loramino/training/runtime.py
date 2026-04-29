@@ -14,13 +14,14 @@ reuse the same execution code.
 
 from copy import deepcopy
 from dataclasses import asdict, dataclass
+import math
 from time import perf_counter
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Sampler
 
 from loramino.adapters.baseline_lora import BaselineLoRA
-from loramino.adapters.batched_lora import BatchedLoRA
+from loramino.adapters.batched_lora import BatchedLoRA, build_adapter_routing_layout
 from loramino.data import (
     TrainingJob,
     build_training_jobs,
@@ -28,6 +29,7 @@ from loramino.data import (
     grouped_batch_collator,
 )
 from loramino.models import loader as load_model
+from .distributed import ddp_enabled, env_world_size, get_local_rank, get_rank, get_world_size, initialize_distributed, is_distributed
 from .scheduler import RankAwareScheduler, ScheduledJobGroup
 
 
@@ -37,6 +39,71 @@ ADAPTER_REGISTRY = {
     "batched": BatchedLoRA,
     "batched_lora": BatchedLoRA,
 }
+
+
+class DistributedBatchPreservingSampler(Sampler[int]):
+    """Shard dataset indices across ranks without breaking precomputed local batches."""
+
+    def __init__(
+        self,
+        dataset_length: int,
+        *,
+        batch_size: int,
+        num_replicas: int,
+        rank: int,
+        shuffle: bool,
+        seed: int,
+    ):
+        if num_replicas < 1:
+            raise ValueError("num_replicas must be at least 1.")
+        if rank < 0 or rank >= num_replicas:
+            raise ValueError(f"rank must be in [0, {num_replicas}), got {rank}.")
+
+        self.dataset_length = int(dataset_length)
+        self.batch_size = max(1, int(batch_size))
+        self.num_replicas = int(num_replicas)
+        self.rank = int(rank)
+        self.shuffle = bool(shuffle)
+        self.seed = int(seed)
+        self.epoch = 0
+        self.num_batches = max(1, math.ceil(self.dataset_length / self.batch_size))
+        self.num_batches_per_replica = math.ceil(self.num_batches / self.num_replicas)
+        self.total_batches = self.num_batches_per_replica * self.num_replicas
+
+    def set_epoch(self, epoch: int) -> None:
+        self.epoch = int(epoch)
+
+    def _build_batch_blocks(self) -> list[list[int]]:
+        if self.dataset_length <= 0:
+            return [list(range(self.batch_size))]
+
+        blocks = []
+        for start in range(0, self.dataset_length, self.batch_size):
+            block = list(range(start, min(start + self.batch_size, self.dataset_length)))
+            if len(block) < self.batch_size:
+                repeats = math.ceil(self.batch_size / len(block))
+                block = (block * repeats)[: self.batch_size]
+            blocks.append(block)
+
+        if self.shuffle:
+            generator = torch.Generator()
+            generator.manual_seed(self.seed + self.epoch)
+            order = torch.randperm(len(blocks), generator=generator).tolist()
+            blocks = [blocks[index] for index in order]
+
+        if len(blocks) < self.total_batches:
+            repeats = math.ceil(self.total_batches / len(blocks))
+            blocks = (blocks * repeats)[: self.total_batches]
+
+        return blocks
+
+    def __iter__(self):
+        blocks = self._build_batch_blocks()
+        rank_blocks = blocks[self.rank : self.total_batches : self.num_replicas]
+        return iter(index for block in rank_blocks for index in block)
+
+    def __len__(self) -> int:
+        return self.num_batches_per_replica * self.batch_size
 
 
 @dataclass
@@ -55,6 +122,8 @@ class TrainingState:
     baseline_adapter_states: list[dict[str, dict[str, torch.Tensor]]] | None = None
     pending_baseline_grads: list[dict[str, torch.Tensor | None] | None] | None = None
     has_pending_step: bool = False
+    max_grad_norm: float | None = None
+    ddp_enabled: bool = False
 
 
 def get_num_adapters(config_options: dict) -> int:
@@ -74,8 +143,13 @@ def set_seed(seed: int | None) -> None:
 
 def resolve_device(config_options: dict) -> torch.device:
     if "device" in config_options:
-        return torch.device(config_options["device"])
+        requested = str(config_options["device"])
+        if requested == "cuda" and env_world_size() > 1:
+            return torch.device(f"cuda:{get_local_rank()}")
+        return torch.device(requested)
     if torch.cuda.is_available():
+        if env_world_size() > 1:
+            return torch.device(f"cuda:{get_local_rank()}")
         return torch.device("cuda")
     return torch.device("cpu")
 
@@ -93,6 +167,22 @@ def normalize_adapter_type(config_options: dict) -> str:
     return adapter_type
 
 
+def _reload_model_tokenizer(model: torch.nn.Module):
+    tokenizer_builder = getattr(model, "build_tokenizer", None)
+    if callable(tokenizer_builder):
+        tokenizer = tokenizer_builder()
+        model.tokenizer = tokenizer
+        return tokenizer
+
+    tokenizer_factory = getattr(model, "tokenizer_factory", None)
+    if callable(tokenizer_factory):
+        tokenizer = tokenizer_factory()
+        model.tokenizer = tokenizer
+        return tokenizer
+
+    return None
+
+
 def _build_adapter(
     linear_layer: torch.nn.Linear,
     adapter_type: str,
@@ -106,6 +196,7 @@ def _build_adapter(
     if adapter_class is BaselineLoRA:
         adapter_kwargs.pop("num_adapters", None)
         adapter_kwargs.pop("rank_groups", None)
+        adapter_kwargs.pop("kernel_backend", None)
 
     return adapter_class(linear_layer, **adapter_kwargs)
 
@@ -210,10 +301,22 @@ def build_dataloader(
         generator = torch.Generator()
         generator.manual_seed(config_options["seed"])
 
+    sampler = None
+    if ddp_enabled(config_options) and is_distributed():
+        sampler = DistributedBatchPreservingSampler(
+            len(dataset),
+            batch_size=config_options["batch_size"],
+            num_replicas=get_world_size(),
+            rank=get_rank(),
+            shuffle=shuffle,
+            seed=config_options.get("seed", 0) or 0,
+        )
+
     return DataLoader(
         dataset,
         batch_size=config_options["batch_size"],
-        shuffle=shuffle,
+        shuffle=shuffle if sampler is None else False,
+        sampler=sampler,
         generator=generator,
         collate_fn=grouped_batch_collator,
     )
@@ -240,6 +343,25 @@ def build_optimizer(model: torch.nn.Module, config_options: dict):
     return optimizer_class(trainable_parameters, **config_options["optimizer_params"])
 
 
+def _trainable_parameters(model: torch.nn.Module) -> list[torch.nn.Parameter]:
+    return [parameter for parameter in model.parameters() if parameter.requires_grad]
+
+
+def _has_non_finite_trainable_grads(model: torch.nn.Module) -> bool:
+    for parameter in _trainable_parameters(model):
+        if parameter.grad is None:
+            continue
+        if not torch.isfinite(parameter.grad).all():
+            return True
+    return False
+
+
+def _clip_trainable_grads(model: torch.nn.Module, max_grad_norm: float | None) -> None:
+    if max_grad_norm is None:
+        return
+    torch.nn.utils.clip_grad_norm_(_trainable_parameters(model), max_grad_norm)
+
+
 def move_batch_to_device(batch: dict, device: torch.device) -> dict:
     return {key: value.to(device) for key, value in batch.items()}
 
@@ -252,6 +374,28 @@ def token_count(batch: dict) -> int:
     if "input_ids" not in batch:
         return 0
     return batch["input_ids"].numel()
+
+
+def infer_tokens_per_example(batch: dict, adapter_ids: torch.Tensor | None) -> int | None:
+    if adapter_ids is None:
+        return None
+
+    examples = int(adapter_ids.shape[0])
+    if examples == 0:
+        return 0
+
+    for key in ("input_ids", "attention_mask", "labels"):
+        value = batch.get(key)
+        if isinstance(value, torch.Tensor) and value.ndim >= 1 and value.shape[0] == examples:
+            return value.numel() // examples
+
+    for key, value in batch.items():
+        if key == "adapter_ids":
+            continue
+        if isinstance(value, torch.Tensor) and value.ndim >= 1 and value.shape[0] == examples:
+            return value.numel() // examples
+
+    return None
 
 
 def build_adapter_ids(batch: dict, num_adapters: int, device: torch.device) -> torch.Tensor:
@@ -268,7 +412,25 @@ def split_batch_for_adapters(batch: dict, num_adapters: int) -> list[dict]:
     ]
 
 
+def _unwrap_parallel_model(model: torch.nn.Module) -> torch.nn.Module:
+    return model.module if hasattr(model, "module") else model
+
+
+def get_model_tokenizer(model: torch.nn.Module):
+    model = _unwrap_parallel_model(model)
+    tokenizer = getattr(model, "tokenizer", None)
+    if callable(tokenizer):
+        return tokenizer
+
+    tokenizer = _reload_model_tokenizer(model)
+    if callable(tokenizer):
+        return tokenizer
+
+    raise TypeError(f"Model {type(model).__name__} does not expose a callable tokenizer.")
+
+
 def collect_baseline_lora_modules(model: torch.nn.Module) -> dict[str, BaselineLoRA]:
+    model = _unwrap_parallel_model(model)
     return {
         name: module
         for name, module in model.named_modules()
@@ -277,6 +439,7 @@ def collect_baseline_lora_modules(model: torch.nn.Module) -> dict[str, BaselineL
 
 
 def collect_batched_lora_modules(model: torch.nn.Module) -> dict[str, BatchedLoRA]:
+    model = _unwrap_parallel_model(model)
     return {
         name: module
         for name, module in model.named_modules()
@@ -284,9 +447,23 @@ def collect_batched_lora_modules(model: torch.nn.Module) -> dict[str, BatchedLoR
     }
 
 
-def set_batched_adapter_ids(model: torch.nn.Module, adapter_ids: torch.Tensor | None) -> None:
+def set_batched_adapter_ids(
+    model: torch.nn.Module,
+    adapter_ids: torch.Tensor | None,
+    *,
+    tokens_per_example: int | None = None,
+) -> None:
+    shared_adapter_ids = None if adapter_ids is None else adapter_ids.detach()
+    shared_layout = None
+    if shared_adapter_ids is not None and tokens_per_example is not None:
+        shared_layout = build_adapter_routing_layout(
+            shared_adapter_ids,
+            tokens_per_example=tokens_per_example,
+        )
+
     for module in collect_batched_lora_modules(model).values():
-        module.active_adapter_ids = None if adapter_ids is None else adapter_ids.detach()
+        module.active_adapter_ids = shared_adapter_ids
+        module.active_routing_layout = shared_layout
 
 
 def extract_baseline_adapter_state(model: torch.nn.Module) -> dict[str, dict[str, torch.Tensor]]:
@@ -375,7 +552,11 @@ def _run_forward_backward(model: torch.nn.Module, batch: dict, optimizer=None):
 
     adapter_ids = batch.get("adapter_ids")
     model_batch = {key: value for key, value in batch.items() if key != "adapter_ids"}
-    set_batched_adapter_ids(model, adapter_ids)
+    set_batched_adapter_ids(
+        model,
+        adapter_ids,
+        tokens_per_example=infer_tokens_per_example(model_batch, adapter_ids),
+    )
     try:
         outputs = model(**model_batch)
         loss = outputs.loss
@@ -410,6 +591,7 @@ def setup_model(config_options: dict):
 
 def create_training_state(config_options: dict) -> TrainingState:
     runtime_config = deepcopy(config_options)
+    initialize_distributed()
     seed = config_options.get("seed")
     set_seed(seed)
 
@@ -437,6 +619,16 @@ def create_training_state(config_options: dict) -> TrainingState:
     model = setup_model(runtime_config)
     device = next(model.parameters()).device
 
+    use_ddp = ddp_enabled(runtime_config) and is_distributed()
+    if use_ddp:
+        from torch.nn.parallel import DistributedDataParallel
+
+        ddp_kwargs = {}
+        if device.type == "cuda":
+            ddp_kwargs["device_ids"] = [device.index]
+            ddp_kwargs["output_device"] = device.index
+        model = DistributedDataParallel(model, **ddp_kwargs)
+
     optimizer = None if multi_adapter_baseline else build_optimizer(model, runtime_config)
     baseline_optimizers = None
     if baseline_adapter_states is not None:
@@ -454,6 +646,8 @@ def create_training_state(config_options: dict) -> TrainingState:
         optimizer=optimizer,
         baseline_optimizers=baseline_optimizers,
         baseline_adapter_states=baseline_adapter_states,
+        max_grad_norm=runtime_config.get("max_grad_norm"),
+        ddp_enabled=use_ddp,
     )
 
 
@@ -522,16 +716,41 @@ def optim_step(state: TrainingState) -> int:
             optimizer = state.baseline_optimizers[adapter_idx]
             optimizer.zero_grad()
             load_trainable_grads(state.model, gradients)
+            if _has_non_finite_trainable_grads(state.model):
+                optimizer.zero_grad(set_to_none=True)
+                continue
+            _clip_trainable_grads(state.model, state.max_grad_norm)
             optimizer.step()
             state.baseline_adapter_states[adapter_idx] = extract_baseline_adapter_state(state.model)
             optimizer_steps += 1
         state.pending_baseline_grads = None
     else:
+        if _has_non_finite_trainable_grads(state.model):
+            if state.optimizer is not None:
+                state.optimizer.zero_grad(set_to_none=True)
+            state.has_pending_step = False
+            return 0
+        _clip_trainable_grads(state.model, state.max_grad_norm)
         state.optimizer.step()
         optimizer_steps = 1
 
     state.has_pending_step = False
     return optimizer_steps
+
+
+def clear_pending_step(state: TrainingState) -> None:
+    if state.multi_adapter_baseline:
+        state.pending_baseline_grads = None
+        for optimizer in state.baseline_optimizers or []:
+            optimizer.zero_grad(set_to_none=True)
+    elif state.optimizer is not None:
+        state.optimizer.zero_grad(set_to_none=True)
+
+    for parameter in state.model.parameters():
+        if parameter.requires_grad:
+            parameter.grad = None
+
+    state.has_pending_step = False
 
 
 def train_epoch(state: TrainingState, dataloader) -> dict:

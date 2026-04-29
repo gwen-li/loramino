@@ -15,6 +15,7 @@ from .runtime import (
     build_lora_checkpoint,
     create_training_state,
     forward_backward as runtime_forward_backward,
+    get_model_tokenizer,
     optim_step as runtime_optim_step,
     summarize_training,
     train_epoch,
@@ -64,7 +65,7 @@ class TrainingClient:
 
     @property
     def tokenizer(self):
-        return self.state.model.tokenizer
+        return get_model_tokenizer(self.state.model)
 
     @property
     def device(self):
@@ -148,6 +149,8 @@ class TrainingClient:
 
         train_start = perf_counter()
         for epoch in range(num_epochs):
+            if hasattr(dataloader, "sampler") and hasattr(dataloader.sampler, "set_epoch"):
+                dataloader.sampler.set_epoch(epoch)
             epoch_iterator = tqdm(dataloader, desc=f"Epoch {epoch}") if self.config_options["verbose"] else dataloader
             epoch_metrics = train_epoch(self.state, epoch_iterator)
             step_times.extend(epoch_metrics["step_times"])

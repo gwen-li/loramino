@@ -4,24 +4,28 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
+from .tokenization import tokenize_fixed_length
+
 
 class OrcaMath(Dataset):
-    def __init__(self, parquet_file, tokenizer, max_length: int = 256):
+    def __init__(self, parquet_file, tokenizer, max_length: int = 256, max_samples: int | None = None):
         self.tokenizer = tokenizer
         self.max_length = max_length
-        self.data = self._load_data(parquet_file)
+        self.data = self._load_data(parquet_file, max_samples=max_samples)
 
-    def _load_data(self, parquet_file):
+    def _load_data(self, parquet_file, *, max_samples: int | None):
         parquet_path = Path(parquet_file)
         if parquet_file and parquet_path.exists():
             data = pd.read_parquet(parquet_path)
 
             if {"question", "answer"}.issubset(data.columns):
-                return data[["question", "answer"]].to_dict("records")
+                records = data[["question", "answer"]].to_dict("records")
+                return records if max_samples is None else records[:max_samples]
 
             if {"questions", "answers"}.issubset(data.columns):
                 renamed = data.rename(columns={"questions": "question", "answers": "answer"})
-                return renamed[["question", "answer"]].to_dict("records")
+                records = renamed[["question", "answer"]].to_dict("records")
+                return records if max_samples is None else records[:max_samples]
 
         try:
             from datasets import load_dataset
@@ -30,17 +34,13 @@ class OrcaMath(Dataset):
                 "Install the `datasets` package or provide a local OrcaMath parquet file."
             ) from exc
 
-        return load_dataset("microsoft/orca-math-word-problems-200k")["train"]
+        dataset = load_dataset("microsoft/orca-math-word-problems-200k")["train"]
+        if max_samples is not None:
+            dataset = dataset.select(range(min(max_samples, len(dataset))))
+        return dataset
 
     def tokenize(self, text):
-        encoded = self.tokenizer(
-            text,
-            truncation=True,
-            padding="max_length",
-            max_length=self.max_length,
-            return_tensors="pt",
-        )
-        return {key: value.squeeze(0) for key, value in encoded.items()}
+        return tokenize_fixed_length(self.tokenizer, text, self.max_length)
 
     def __len__(self):
         return len(self.data)

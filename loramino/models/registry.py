@@ -10,5 +10,5 @@ model_dict: dict[str, Callable[[], Model]] = {
     'pythia-160m': lambda: Pythia(num_params='160m'),
     'pythia-410m': lambda: Pythia(num_params='410m'),
     'pythia-1b': lambda: Pythia(num_params='1b'),
+    'pythia-2.8b': lambda: Pythia(num_params='2.8b'),
 }
-

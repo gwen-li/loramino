@@ -14,14 +14,20 @@ from dataclasses import dataclass
 import torch
 from torch.utils.data import Dataset
 
+from .dolly_15k import Dolly15k
 from .orca_math import OrcaMath
+from .tiny_dolly_15k import TinyDolly15k
 from .tiny_orca_math import TinyOrcaMath
 
 
 DATASET_REGISTRY = {
     "default": OrcaMath,
+    "dolly_15k": Dolly15k,
+    "dolly-15k": Dolly15k,
     "orca_math": OrcaMath,
     "orca-math": OrcaMath,
+    "tiny_dolly_15k": TinyDolly15k,
+    "tiny-dolly-15k": TinyDolly15k,
     "tiny_orca_math": TinyOrcaMath,
     "tiny-orca-math": TinyOrcaMath,
 }
@@ -33,6 +39,7 @@ class DatasetJobSpec:
 
     dataset_type: str
     dataset_path: str
+    dataset_options: dict
     adapter_id: int
     max_length: int
 
@@ -45,6 +52,7 @@ class TrainingJob:
     adapter_id: int
     dataset_type: str
     dataset_path: str
+    dataset_options: dict
     max_length: int
     rank: int
     alpha: float
@@ -67,31 +75,112 @@ class JobDataset(Dataset):
 
 
 class GroupedDataset(Dataset):
-    """Simple round-robin view across multiple job-local datasets."""
+    """Grouped view across multiple job-local datasets.
 
-    def __init__(self, job_datasets: list[JobDataset], job_groups: list[list[int]] | None = None):
+    By default we emit contiguous per-adapter chunks sized to fit the configured
+    grouped batch. That makes each training step less fragmented than strict
+    one-example round robin, which helps the grouped LoRA runtime see larger
+    same-adapter slices inside a batch.
+
+    The older strict round-robin order is still available for debugging by
+    setting ``strategy="round_robin"``.
+    """
+
+    def __init__(
+        self,
+        job_datasets: list[JobDataset],
+        job_groups: list[list[int]] | None = None,
+        *,
+        batch_size: int = 1,
+        strategy: str = "chunked",
+    ):
         if not job_datasets:
             raise ValueError("GroupedDataset requires at least one job dataset.")
+        if strategy not in {"chunked", "round_robin"}:
+            raise ValueError("GroupedDataset strategy must be 'chunked' or 'round_robin'.")
 
         self.job_datasets = job_datasets
-        self.index_map = self._build_round_robin_index(job_datasets, job_groups)
+        self.index_map = self._build_index_map(
+            job_datasets,
+            job_groups,
+            batch_size=max(1, int(batch_size)),
+            strategy=strategy,
+        )
 
     @staticmethod
-    def _build_round_robin_index(
+    def _build_index_map(
         job_datasets: list[JobDataset],
         job_groups: list[list[int]] | None,
+        *,
+        batch_size: int,
+        strategy: str,
     ) -> list[tuple[int, int]]:
         if job_groups is None:
             job_groups = [list(range(len(job_datasets)))]
 
         index_map = []
         for job_group in job_groups:
-            max_length = max(len(job_datasets[job_index]) for job_index in job_group)
-            for local_index in range(max_length):
-                for job_index in job_group:
-                    dataset = job_datasets[job_index]
-                    if local_index < len(dataset):
-                        index_map.append((job_index, local_index))
+            if strategy == "round_robin":
+                index_map.extend(GroupedDataset._build_round_robin_index(job_datasets, job_group))
+                continue
+            index_map.extend(
+                GroupedDataset._build_chunked_group_index(
+                    job_datasets,
+                    job_group,
+                    batch_size=batch_size,
+                )
+            )
+        return index_map
+
+    @staticmethod
+    def _build_round_robin_index(
+        job_datasets: list[JobDataset],
+        job_group: list[int],
+    ) -> list[tuple[int, int]]:
+        max_length = max(len(job_datasets[job_index]) for job_index in job_group)
+        index_map = []
+        for local_index in range(max_length):
+            for job_index in job_group:
+                dataset = job_datasets[job_index]
+                if local_index < len(dataset):
+                    index_map.append((job_index, local_index))
+        return index_map
+
+    @staticmethod
+    def _per_job_chunk_sizes(job_group: list[int], batch_size: int) -> dict[int, int]:
+        group_size = len(job_group)
+        base_chunk = max(1, batch_size // group_size)
+        remainder = max(0, batch_size - (base_chunk * group_size))
+        return {
+            job_index: base_chunk + (1 if offset < remainder else 0)
+            for offset, job_index in enumerate(job_group)
+        }
+
+    @staticmethod
+    def _build_chunked_group_index(
+        job_datasets: list[JobDataset],
+        job_group: list[int],
+        *,
+        batch_size: int,
+    ) -> list[tuple[int, int]]:
+        max_length = max(len(job_datasets[job_index]) for job_index in job_group)
+        chunk_sizes = GroupedDataset._per_job_chunk_sizes(job_group, batch_size)
+        index_map = []
+        local_offsets = {job_index: 0 for job_index in job_group}
+
+        while True:
+            emitted_any = False
+            for job_index in job_group:
+                dataset = job_datasets[job_index]
+                start = local_offsets[job_index]
+                if start >= len(dataset):
+                    continue
+                stop = min(start + chunk_sizes[job_index], len(dataset), max_length)
+                index_map.extend((job_index, local_index) for local_index in range(start, stop))
+                local_offsets[job_index] = stop
+                emitted_any = True
+            if not emitted_any:
+                break
         return index_map
 
     def __len__(self):
@@ -113,6 +202,7 @@ def _coerce_job_spec(
         return DatasetJobSpec(
             dataset_type=default_dataset_type,
             dataset_path=job_config,
+            dataset_options={},
             adapter_id=adapter_id,
             max_length=default_max_length,
         )
@@ -122,6 +212,7 @@ def _coerce_job_spec(
         return DatasetJobSpec(
             dataset_type=dataset_type,
             dataset_path=dataset_path,
+            dataset_options={},
             adapter_id=adapter_id,
             max_length=default_max_length,
         )
@@ -132,14 +223,25 @@ def _coerce_job_spec(
             dataset_type = dataset_config.get("type", job_config.get("dataset_type", default_dataset_type))
             dataset_path = dataset_config.get("path", job_config.get("path", ""))
             max_length = dataset_config.get("max_length", job_config.get("max_length", default_max_length))
+            dataset_options = dict(job_config.get("dataset_options", {}))
+            dataset_options.update(dataset_config.get("options", {}))
+            dataset_options.update(
+                {
+                    key: value
+                    for key, value in dataset_config.items()
+                    if key not in {"type", "path", "max_length", "options"}
+                }
+            )
         else:
             dataset_type = job_config.get("dataset_type", job_config.get("name", default_dataset_type))
             dataset_path = dataset_config if isinstance(dataset_config, str) else job_config.get("path", "")
             max_length = job_config.get("max_length", default_max_length)
+            dataset_options = dict(job_config.get("dataset_options", {}))
 
         return DatasetJobSpec(
             dataset_type=dataset_type,
             dataset_path=dataset_path,
+            dataset_options=dataset_options,
             adapter_id=job_config.get("adapter_id", adapter_id),
             max_length=max_length,
         )
@@ -245,6 +347,7 @@ def build_training_jobs(config_options: dict) -> list[TrainingJob]:
                 adapter_id=job_spec.adapter_id,
                 dataset_type=job_spec.dataset_type,
                 dataset_path=job_spec.dataset_path,
+                dataset_options=dict(job_spec.dataset_options),
                 max_length=job_spec.max_length,
                 rank=int(job_rank),
                 alpha=float(job_alpha),
@@ -265,6 +368,7 @@ def _build_base_dataset(job: TrainingJob, tokenizer) -> Dataset:
         job.dataset_path,
         tokenizer,
         max_length=job.max_length,
+        **job.dataset_options,
     )
 
 
@@ -296,7 +400,12 @@ def build_training_dataset(
     if len(job_datasets) == 1:
         return job_datasets[0]
 
-    return GroupedDataset(job_datasets, job_groups=job_groups)
+    return GroupedDataset(
+        job_datasets,
+        job_groups=job_groups,
+        batch_size=config_options.get("batch_size", 1),
+        strategy=config_options.get("grouped_batching_strategy", "chunked"),
+    )
 
 
 def grouped_batch_collator(examples: list[dict]) -> dict[str, torch.Tensor]:
